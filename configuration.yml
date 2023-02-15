@@ -15,4 +15,4 @@ ftdi_input_pin_num:  '1'
 ftdi_output_pin_num: '0'
 
 adb_fastboot_path: '"C:\Program Files"\platform-tools'
-fw_path: 'D:\Projects\Python\simcom7600-flasher\repo\FlashData\LE11B14SIM7600M22_211104'
+fw_path: 'D:\Projects\Python\simcom7600-flasher\Repository\Modem_Programmer\FlashData\LE11B14SIM7600M22_211104'
