@@ -59,6 +59,6 @@ class FtdiDriver:
 
 if __name__ == '__main__':
     f = FtdiDriver()
-    sleep(1)
+    Ftdi.show_devices()
     f.Config("ftdi://ftdi:2232:FT5X4HI2/1")
     f.SetPowerPin(True)

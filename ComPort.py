@@ -57,24 +57,26 @@ class ComPort:
 
     def getATResponse(self) -> str:
         return self._com.readall().decode('utf-8')
+    
+    
 import usb.core
 
 if __name__ == '__main__':
-    # cp = ComPort()
-    # print(cp.getPortsList())
+    cp = ComPort()
+    # print(cp.getPortsList(0))
     # port = input()
     # cp.openPort(port)k
 
-    # ports = serial.tools.list_ports.comports()
+    ports = serial.tools.list_ports.comports()
 
-    # for port, desc, hwid in ports:
-    #     if desc.find("AT") > 0:
-    #         print("{}: {} [{}]".format(port, desc, hwid))
-    #         print(hwid[hwid.find("LOCATION") : ])
+    for port, desc, hwid in ports:
+        if desc.find("AT") > 0:
+            print("{}: {} [{}]".format(port, desc, hwid))
+            print(hwid[hwid.find("LOCATION") : ])
 
     # print(len(ports), 'ports found')
 
-    print(usb.core.find())
+    # print(usb.core.find())
 
 # COM14: SimTech HS-USB AT Port 9001 (COM14) [AWUSB\VID_1E0E&PID_9001&MI_02\5&1148094C&0&0002]
 # COM18: SimTech HS-USB AT Port 9001 (COM18) [AWUSB\VID_1E0E&PID_9001&MI_02\5&1939758C&0&0002]kkk
