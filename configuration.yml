@@ -1,0 +1,18 @@
+# Amount of chips to prog simultaneously
+chip_number: 2
+
+# Chip start name for correct port list in GUI
+chip_name_1: 'SimTech HS-USB AT Port 9001 (COM4)'
+chip_name_2: 'SimTech HS-USB AT Port 9001 (COM10)'
+
+# URLS of connected FTDIs in view of right order. Amount must be equal to 'chip_number'
+# ftdii_url_1: 'FT2232H MiniModule : FT5X4HI2 : 1'
+# ftdii_url_2: 'FT2232H MiniModule : FT5X4HI2 : 2'
+ftdii_url_1: 'ftdi://ftdi:2232:FT5X4HI2/1'
+ftdii_url_2: 'ftdi://ftdi:2232:FT7FLE7U/1'
+
+ftdi_input_pin_num:  '1'
+ftdi_output_pin_num: '0'
+
+adb_fastboot_path: '"C:\Program Files"\platform-tools'
+fw_path: 'D:\Projects\Python\simcom7600-flasher\repo\FlashData\LE11B14SIM7600M22_211104'
