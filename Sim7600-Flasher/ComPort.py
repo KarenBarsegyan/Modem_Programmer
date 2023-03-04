@@ -23,7 +23,7 @@ class ComPort:
 
                 desc = str(port.description)
                 if desc.find(self._start_names[chipNum]) >= 0: 
-                    result.append(str(port.name) + " : " + str(port.description))
+                    result.append(str(port.name))# + " : " + str(port.description))
                     
             except (OSError, serial.SerialException):
                 pass

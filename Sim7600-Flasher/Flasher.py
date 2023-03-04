@@ -159,8 +159,8 @@ class _FlasherThread(QThread):
         self._flasher = Flasher()
         self._comport = comport
         self._ftdiportUrl = ftdiport
-        self._ftdiport = FtdiDriver()
-        self._ftdiport.Config(ftdiport)
+        # self._ftdiport = FtdiDriver()
+        # self._ftdiport.Config(ftdiport)
 
     def run(self) -> None:
         print(f'Take on Power on {self._ftdiportUrl}')
@@ -189,4 +189,18 @@ class _FlasherThread(QThread):
 
         print(f'Succesfully flashed {self._comport}')
         print(f'Take off Power on {self._ftdiportUrl}')
-        self._ftdiport.SetPowerPin(False)
+        # self._ftdiport.SetPowerPin(False)
+
+
+from PyQt6.QtWidgets import QApplication
+import sys
+
+if __name__ == '__main__':
+    flasher = Flasher()
+
+    app = QApplication(sys.argv)
+
+    flasher.flashModem('COM28', 'ftdi://ftdi:2232:FT5X4HI2/1')
+    # flasher.flashModem('COM33', 'ftdi://ftdi:2232:FT7FLE7U/1')
+
+    app.exec()

@@ -3,7 +3,7 @@ chip_number: 2
 
 # Chip start name for correct port list in GUI
 chip_name_1: 'SimTech HS-USB AT Port 9001 (COM28)'
-chip_name_2: 'SimTech HS-USB AT Port 9001 (COM33)'
+chip_name_2: 'SimTech HS-USB AT Port 9001 (COM37)'
 
 # URLS of connected FTDIs in view of right order. Amount must be equal to 'chip_number'
 # ftdii_url_1: 'FT2232H MiniModule : FT5X4HI2 : 1'
