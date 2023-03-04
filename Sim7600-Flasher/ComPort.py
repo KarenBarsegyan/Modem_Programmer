@@ -1,20 +1,14 @@
 import sys
-import glob
-import serial
 import yaml
-# from serial.tools import list_ports
+import serial
 from serial.tools.list_ports import comports
-
 
 class ComPort:
     def __init__(self):
         self._com = serial.Serial()
         self._config = yaml.load(open("configuration.yml"), yaml.SafeLoader)
-        self._start_names = []
-        for cnt in range(self._config['chip_number']):
-            self._start_names.append(self._config['chip_name_%s' %(cnt+1)])
 
-    def getPortsList(self, chipNum) -> list:
+    def getPortsList(self) -> list:
         result = []
         for port in serial.tools.list_ports.comports():
             try:
@@ -22,9 +16,9 @@ class ComPort:
                 s.close()
 
                 desc = str(port.description)
-                if desc.find(self._start_names[chipNum]) >= 0: 
-                    result.append(str(port.name))# + " : " + str(port.description))
-                    
+                if desc.find(self._config['com_name']) >= 0: 
+                    result.append(str(port.name)) # : str(port.description)})  
+
             except (OSError, serial.SerialException):
                 pass
         return sorted(result)
@@ -57,36 +51,10 @@ class ComPort:
 
     def getATResponse(self) -> str:
         return self._com.readall().decode('utf-8')
-    
-    
-import usb.core
+
 
 if __name__ == '__main__':
     cp = ComPort()
-    # print(cp.getPortsList(0))
-    # port = input()
-    # cp.openPort(port)k
-
-    ports = serial.tools.list_ports.comports()
-
-    for port, desc, hwid in ports:
-        if desc.find("AT") > 0:
-            print("{}: {} [{}]".format(port, desc, hwid))
-            print(hwid[hwid.find("LOCATION") : ])
-
-    # print(len(ports), 'ports found')
-
-    # print(usb.core.find())
-
-# COM14: SimTech HS-USB AT Port 9001 (COM14) [AWUSB\VID_1E0E&PID_9001&MI_02\5&1148094C&0&0002]
-# COM18: SimTech HS-USB AT Port 9001 (COM18) [AWUSB\VID_1E0E&PID_9001&MI_02\5&1939758C&0&0002]kkk
-
-
-# Port 1
-# COM18: SimTech HS-USB AT Port 9001 (COM18) [AWUSB\VID_1E0E&PID_9001&MI_02\5&1939758C&0&0002]
-# COM14: SimTech HS-USB AT Port 9001 (COM14) [AWUSB\VID_1E0E&PID_9001&MI_02\5&1148094C&0&0002]
-# COM14: SimTech HS-USB AT Port 9001 (COM14) [AWUSB\VID_1E0E&PID_9001&MI_02\5&1148094C&0&0002]
-# COM14: SimTech HS-USB AT Port 9001 (COM14) [AWUSB\VID_1E0E&PID_9001&MI_02\5&1148094C&0&0002]
-# Port 2
-# COM14: SimTech HS-USB AT Port 9001 (COM14) [AWUSB\VID_1E0E&PID_9001&MI_02\5&1148094C&0&0002]
-# COM14: SimTech HS-USB AT Port 9001 (COM14) [AWUSB\VID_1E0E&PID_9001&MI_02\5&1148094C&0&0002]
+    print(cp.getPortsList())
+    port = input()
+    cp.openPort(port)

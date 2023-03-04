@@ -12,7 +12,7 @@ from PyQt6.QtCore import (
 )
 from Workplace import Workplace
 from ComPort import ComPort
-from FtdiPort import FtdiDriver
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -28,17 +28,15 @@ class MainWindow(QMainWindow):
         self._mainLayout = QGridLayout()
         self._mainWidget.setLayout(self._mainLayout)
 
-        self._cp = ComPort()        # переменная для работы со списком Com портов
-        self._ftdi = FtdiDriver()   # переменная для работы со списком FTDI портов
-        self._group = []            # список рабочих групп (рамок с подписью "Рабочее место №")
-        self._wp = []               # список рабочих пространств для взаимодействия с модемом
+        self._cp = ComPort()  # переменная для работы со списком Com портов
+        self._group = []      # список рабочих групп (рамок с подписью "Рабочее место №")
+        self._wp = []         # список рабочих пространств для взаимодействия с модемом
         for i in range(0, self.chipQty):
             self._wp.append(Workplace(i))  # создание нового рабочего пространства
             self._group.append(QGroupBox())
 
         # заполнение главного окна
         self._uiJoin()
-        self._btnRefreshPortList()
 
         self.show()
 
@@ -59,5 +57,6 @@ class MainWindow(QMainWindow):
         self._refresh_button.clicked.connect(self._btnRefreshPortList)
 
     def _btnRefreshPortList(self):
+        ports = self._cp.getPortsList()
         for i in range(0, self.chipQty):
-            self._wp[i].uiRefreshPortsList()
+            self._wp[i].uiRefreshComPortList(ports)

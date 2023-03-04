@@ -1,0 +1,6 @@
+chip_number: 1
+
+com_name: 'SimTech HS-USB AT Port'
+
+adb_fastboot_path: '"C:\Program Files"\platform-tools'
+fw_path: 'D:\Projects\Programmer\Sim76Programmer\simcom7600-flasher\Repository\Modem_Programmer\Sim7600-Flasher\FlashData\LE11B14SIM7600M22_211104'

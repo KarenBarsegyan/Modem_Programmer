@@ -2,7 +2,7 @@ import yaml
 import subprocess
 from ComPort import ComPort
 from PyQt6.QtCore import QThread
-from FtdiPort import FtdiDriver
+
 
 class Flasher:
     def __init__(self):
@@ -37,7 +37,7 @@ class Flasher:
         """Set modem ADB mode"""
         try:
             cp = ComPort()
-            cp.openPort(port)  # неправильно сделана обработка исключений - переделать
+            cp.openPort(port)  # неправильно сделана обработка исключений - пределать
             cp.sendATCommand('at+cusbadb=1')
             if 'OK' in cp.getATResponse():
                 print(f'ADB на {port} включился успешно')
@@ -148,34 +148,25 @@ class Flasher:
         self._fastbootFlashBoot()
         self._fastbootFlashSystem()
 
-    def flashModem(self, comport='' , ftdiport=''):
-        self._flash_thread = _FlasherThread(comport, ftdiport)
+    def flashModem(self, comport=''):
+        self._flash_thread = _FlasherThread(comport)
         self._flash_thread.start()
 
 
 class _FlasherThread(QThread):
-    def __init__(self, comport='', ftdiport ='', parent=None):
+    def __init__(self, comport='', parent=None):
         QThread.__init__(self, parent)
         self._flasher = Flasher()
-        self._comport = comport
-        self._ftdiportUrl = ftdiport
-        # self._ftdiport = FtdiDriver()
-        # self._ftdiport.Config(ftdiport)
+        self._port = comport
 
     def run(self) -> None:
-        print(f'Take on Power on {self._ftdiportUrl}')
-        # self._ftdiport.SetPowerPin(False)
-        # QThread.sleep(5)
-        # self._ftdiport.SetPowerPin(True)
-        # QThread.sleep(18)
-
-        print(f'Start flashing {self._comport}')
-        self._flasher._setAdbMode(self._comport)
+        print(f'Start flashing {self._port}')
+        self._flasher._setAdbMode(self._port)
         QThread.sleep(25)
 
         adb_devices = self._flasher.getAdbDevices()
-        print(adb_devices) 
-        if adb_devices[1] == '': #!ERROR
+        print(adb_devices)
+        if adb_devices[1] == '':
             print('Прошивка не удалась, выход')
             return
 
@@ -187,20 +178,4 @@ class _FlasherThread(QThread):
         self._flasher._setNormalMode()
         QThread.sleep(5)
 
-        print(f'Succesfully flashed {self._comport}')
-        print(f'Take off Power on {self._ftdiportUrl}')
-        # self._ftdiport.SetPowerPin(False)
-
-
-from PyQt6.QtWidgets import QApplication
-import sys
-
-if __name__ == '__main__':
-    flasher = Flasher()
-
-    app = QApplication(sys.argv)
-
-    flasher.flashModem('COM28', 'ftdi://ftdi:2232:FT5X4HI2/1')
-    # flasher.flashModem('COM33', 'ftdi://ftdi:2232:FT7FLE7U/1')
-
-    app.exec()
+        print(f'Stop flashing {self._port}')

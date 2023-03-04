@@ -13,37 +13,28 @@ from PyQt6.QtCore import (
 )
 from ComPort import ComPort
 from Flasher import Flasher, _FlasherThread
-from FtdiPort import FtdiDriver
+
 
 class Workplace(QVBoxLayout):
     def __init__(self, wp_number):
         super().__init__()
         self._wpnumber = wp_number  # номер текущего рп
         self._cp = ComPort()  # объект для работы с модулем COM портов
-        self._ftdi = FtdiDriver()  # переменная для работы со списком FTDI портов
         self._flasher = Flasher()  # объект для прошивки модема
         self._uiAddWidgets()  # заполнение рабочего пространства
 
     def _uiAddWidgets(self):
         self._uiAddComPortList()
-        self._uiAddFtdiList()
         self._uiAddStatusField()
         self._uiAddInstructionField()
         self._uiAddFlashButton()
 
     def _uiAddComPortList(self):
         self._listcomports = QListWidget()
-        # comports = self._cp.getPortsList()
-        # self._listcomports.addItems(comports)
-        self._listcomports.setMaximumSize(QSize(640, 320))
+        comports = self._cp.getPortsList()
+        self._listcomports.addItems(comports)
+        self._listcomports.setMaximumSize(QSize(1280, 320))
         self.addWidget(self._listcomports)
-
-    def _uiAddFtdiList(self):
-        self._listftdiports = QListWidget()
-        # ftdis = self._ftdi.getPortsList()
-        # self._listftdiports.addItems(ftdis)
-        self._listftdiports.setMaximumSize(QSize(640, 320))
-        self.addWidget(self._listftdiports)
 
     def _uiAddStatusField(self):
         self._status = QLabel()
@@ -71,24 +62,14 @@ class Workplace(QVBoxLayout):
 
     def _btnFlashClickedCallback(self):
         cp_list = self._listcomports.selectedItems()
-        ftdi_list = self._listftdiports.selectedItems()
-        if len(cp_list) == 0 or len(ftdi_list) == 0:
+        if len(cp_list) == 0:
             return
-        self._flasher.flashModem(cp_list[0].text(), ftdi_list[0].text())
+        self._flasher.flashModem(cp_list[0].text())
         self.uiRefreshInstructionField("Прошивка началась...")
 
-    def uiRefreshPortsList(self):
-        com_port = self._cp.getPortsList(self._wpnumber)
+    def uiRefreshComPortList(self, list_to_add):
         self._listcomports.clear()
-        self._listcomports.addItems(com_port)
-
-        ftdi_port = self._ftdi.getPortsList(self._wpnumber)
-        self._listftdiports.clear()
-        self._listftdiports.addItems(ftdi_port)
-        for ftdp in ftdi_port:
-            ftdiport = FtdiDriver()
-            ftdiport.Config(ftdp)
-            ftdiport.SetPowerPin(True)
+        self._listcomports.addItems(list_to_add)
 
     def uiRefreshInstructionField(self, text: str):
         self._instructions.clear()
