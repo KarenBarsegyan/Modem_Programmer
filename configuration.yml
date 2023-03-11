@@ -1,6 +1,7 @@
 chip_number: 1
 
-com_name: 'SimTech HS-USB AT Port'
+com_name_win: 'SimTech HS-USB AT Port'
+com_name_linux: 'SimTech'
 
-adb_fastboot_path: '"C:\Program Files"\platform-tools'
-fw_path: 'D:\Projects\Programmer\Sim76Programmer\simcom7600-flasher\Repository\Modem_Programmer\Sim7600-Flasher\FlashData\LE11B14SIM7600M22_211104'
+adb_fastboot_path: '/usr/lib/android-sdk/platform-tools/adb'
+fw_path: '/home/pi/Work/Modem_Programmer/FlashData/LE11B14SIM7600M22_211104/'

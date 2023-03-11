@@ -11,16 +11,15 @@ class ComPort:
     def getPortsList(self) -> list:
         result = []
         for port in serial.tools.list_ports.comports():
-            try:
-                s = serial.Serial(port.name)
-                s.close()
+            desc = str(port.description)
+            if sys.platform.startswith('win'):
+                if desc.find(self._config['com_name_win']) >= 0: 
+                    result.append(str(port.name))  
+            
+            elif sys.platform.startswith('linux'):
+                if desc.find(self._config['com_name_linux']) >= 0: 
+                    result.append(str(port.name)) 
 
-                desc = str(port.description)
-                if desc.find(self._config['com_name']) >= 0: 
-                    result.append(str(port.name)) # : str(port.description)})  
-
-            except (OSError, serial.SerialException):
-                pass
         return sorted(result)
 
     def openPort(self, comport: str):
@@ -56,5 +55,5 @@ class ComPort:
 if __name__ == '__main__':
     cp = ComPort()
     print(cp.getPortsList())
-    port = input()
-    cp.openPort(port)
+    # port = input()
+    # cp.openPort(port)
