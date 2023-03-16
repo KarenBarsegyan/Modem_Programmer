@@ -1,0 +1,5 @@
+com_name_win: 'SimTech HS-USB AT Port'
+com_name_linux: 'SimTech'
+
+adb_fastboot_path: '/usr/lib/android-sdk/platform-tools/'
+fw_path: '/home/pi/Work/Modem_Programmer/FlashData/LE11B14SIM7600M22_211104/'
