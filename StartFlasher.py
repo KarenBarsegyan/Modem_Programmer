@@ -6,19 +6,18 @@ async def main_thread(ws_server):
     print("Main Thread")
     flasher = Flasher()
 
-    await asyncio.sleep(5)
-    print("Main after sleep 10")
-    cmd, msg = await ws_server.receive()
-    print(f"cmd {cmd} ; msg {msg}")
-    print("Main after receive")
+    while True:
+        cmd, msg = await ws_server.receive()
 
-    if cmd == 'Start Flashing':
-        print("Flash Started")
+        print("Main after receive")
 
-        # await flasher.flashModem('/dev/ttyUSB2', ws_server)
+        if cmd == 'Start Flashing':
+            print("Flash Started")
 
-        await ws_server.send('End Flashing', 'Ok')
-        
+            if await flasher.flashModem('/dev/ttyUSB2', ws_server):
+                await ws_server.send('End Flashing', 'Ok')
+            else:
+                await ws_server.send('End Flashing', 'Not Ok')
 
 
 async def main():

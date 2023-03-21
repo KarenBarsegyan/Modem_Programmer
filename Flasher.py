@@ -150,13 +150,11 @@ class Flasher:
         await self._fastbootFlashBoot()
         await self._fastbootFlashSystem()
 
-    async def flashModem(self, comport, websocket):
+    async def flashModem(self, comport, websocket) -> bool:
         self._port = comport
 
         print(f'Start flashing {self._port}')
-        # await websocket.send(
-        #     json.dumps({'cmd': 'Log', 'log': 'Start flashing'})
-        # )
+        await websocket.send('Log', 'Start Flashing')
 
         await self._setAdbMode(self._port)
         await asyncio.sleep(20)
@@ -167,14 +165,10 @@ class Flasher:
         
         if adb_devices[1] == '':
             print('No ADB device found')
-            # await websocket.send(
-            #     json.dumps({'cmd': 'Log', 'log': 'NO ADB device found'})
-            # )   
-            # return
-        # else:
-        #     await websocket.send(
-        #         json.dumps({'cmd': 'Log', 'log': 'ADB device found!'})
-        #     )   
+            await websocket.send('Log', 'No ADB device found') 
+            return False
+        else:
+            await websocket.send('Log', 'ADB device found!') 
 
         await self._setBootloaderMode()
         await asyncio.sleep(2)
@@ -185,9 +179,9 @@ class Flasher:
         await asyncio.sleep(5)
 
         print(f'Stop flashing {self._port}')
-        # await websocket.send(
-        #     json.dumps({'cmd': 'Log', 'log': 'Stop flashing'})
-        # )
+        await websocket.send('Log', 'Stop flashing') 
+
+        return True
 
 
 # class _FlasherThread():
