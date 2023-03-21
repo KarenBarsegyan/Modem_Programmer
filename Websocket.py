@@ -17,10 +17,15 @@ class WebSocketServer():
 
     async def start(self):
         print("Def Start")
-        async with websockets.serve(self._connected_handler, self._ip, self._port):
-            await asyncio.Future()  # run forever
+        loop = asyncio.get_running_loop()
+
+        men = await websockets.serve(self._connected_handler, self._ip, self._port)
+        
+        loop.create_task(men.serve_forever())
+
 
         print("Def Start end")
+        # DONT FORGET TO CLOSE
 
 
     async def _connected_handler(self, websocket):
@@ -53,5 +58,4 @@ class WebSocketServer():
             rx_data = json.loads(await self._websocket.recv())
             return rx_data['cmd'], rx_data['msg']
         except:
-            print('Connection Closed')
-            return 'Error', 'Connection Closed'
+            raise
