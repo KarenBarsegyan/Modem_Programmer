@@ -14,10 +14,10 @@ async def main_thread(ws_server):
         if cmd == 'Start Flashing':
             print("Flash Started")
 
-            # if await flasher.flashModem('/dev/ttyUSB2', ws_server):
-            #     await ws_server.send('End Flashing', 'Ok')
-            # else:
-            #     await ws_server.send('End Flashing', 'Not Ok')
+            if await flasher.flashModem('/dev/ttyUSB2', ws_server):
+                await ws_server.send('End Flashing', 'Ok')
+            else:
+                await ws_server.send('End Flashing', 'Not Ok')
 
 
 async def main():
