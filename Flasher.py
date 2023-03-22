@@ -141,14 +141,21 @@ class Flasher:
         except Exception:
             print('Couldn\'t flash system!')
 
-    async def _fastbootFlash(self):
+    async def _fastbootFlash(self, websocket):
         await self._fastbootFlashAboot()
+        await websocket.send('Log', 'FlashAboot Done')
         await self._fastbootFlashRpm()
+        await websocket.send('Log', 'FlashRpm Done')
         await self._fastbootFlashSbl()
+        await websocket.send('Log', 'FlashSbl Done')
         await self._fastbootFlashTz()
+        await websocket.send('Log', 'FlashTz Done')
         await self._fastbootFlashModem()
+        await websocket.send('Log', 'FlashModem Done')
         await self._fastbootFlashBoot()
+        await websocket.send('Log', 'FlashBoot Done')
         await self._fastbootFlashSystem()
+        await websocket.send('Log', 'FlashSystem Done')
 
     async def flashModem(self, comport, websocket) -> bool:
         self._port = comport
@@ -173,7 +180,7 @@ class Flasher:
         await self._setBootloaderMode()
         await asyncio.sleep(2)
 
-        await self._fastbootFlash()
+        await self._fastbootFlash(websocket)
 
         await self._setNormalMode()
         await asyncio.sleep(5)
