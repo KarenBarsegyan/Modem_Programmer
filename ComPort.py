@@ -31,7 +31,7 @@ class ComPort:
             try:
                 self._com.open()
             except serial.SerialException:
-                print('Exception : Couldn\'t open COM port')
+                raise
         else:
             print(comport + ' already opened')
 

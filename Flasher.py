@@ -29,40 +29,65 @@ class Flasher:
         gpio.output(RELAY_PIN, gpio.HIGH)
         gpio.cleanup()
 
+    async def _print_msg(self, level: str, msg: str):
+        if level == 'INFO':
+            flash_logger.info(msg)
+            await self._websocket.send('Log', msg)
+
+        elif level == 'WARNING':
+            flash_logger.warning(msg)
+            await self._websocket.send('Log', msg)
+
+        elif level == 'ERROR':
+            flash_logger.error(msg)
+            await self._websocket.send('Log', msg)
+
+        else:
+            raise Exception('Wrong log level')
+
     async def getAdbDevices(self):
-        try:
-            adb_res = subprocess.Popen(
-                self._config['adb_fastboot_path'] + r'\adb devices',
-                shell=True,
-                stdout=subprocess.PIPE
-            ).stdout.read().decode('utf-8').split('\r\n')
-        except Exception:
-            flash_logger.error('GetAdbDevices Error')
-            adb_res = []
+        for i in range(30):
+            try:
+                adb_res = subprocess.Popen(
+                    self._config['adb_fastboot_path'] + r'\adb devices',
+                    shell=True,
+                    stdout=subprocess.PIPE
+                ).stdout.read().decode('utf-8').split('\r\n')
+            except Exception:
+                await self._print_msg('ERROR', 'GetAdbDevices Error')
+                adb_res = []
+
+            if sys.platform.startswith('linux'):
+                adb_res = adb_res[0].split('\n')
+
+            if adb_res[1] != '':
+                return adb_res
+            
+            await asyncio.sleep(1)
+
         return adb_res
 
 
     async def _setAdbMode(self, port) -> bool:
         """Set modem ADB mode"""
-        try:
-            cp = ComPort()
-            cp.openPort(port)  # неправильно сделана обработка исключений - пределать
-            cp.sendATCommand('at+cusbadb=1')
-            await asyncio.sleep(0.5)
-            if 'OK' in cp.getATResponse():
-                cp.sendATCommand('at+creset')
-                flash_logger.info(f'ADB on {port} is taken On succesfully')
-                await self._websocket.send('Log', 'ADB is taken On succesfully')
-                return True
+        for i in range(30):
+            try:
+                cp = ComPort()
+                cp.openPort(port)
+                cp.sendATCommand('at+cusbadb=1')
+                await asyncio.sleep(0.5)
+                if 'OK' in cp.getATResponse():
+                    cp.sendATCommand('at+creset')
+                    await self._print_msg('INFO', f'ADB on {port} is taken On succesfully')
+                    return True
             
-            flash_logger.info(f'ADB on {port} was not taken on')
-            await self._websocket.send('Log', 'ADB was not taken on')
+            except Exception: pass
 
-            return False
-        except Exception:
-            flash_logger.info(f'Taking on ADB on {port} ended with error')
-            await self._websocket.send('Log', 'Taking on ADB ended with error')
-            return False
+            await asyncio.sleep(1)
+            # await self._print_msg('INFO', f'Try {i}')
+        
+        await self._print_msg('ERROR', f'ADB on {port} was not taken on')
+        return False
 
     async def _setBootloaderMode(self):
         """Reboot device in bootloader (fastboot) mode"""
@@ -73,7 +98,7 @@ class Flasher:
                 stdout=subprocess.PIPE
             )
         except Exception:
-            flash_logger.error('SetBootloaderMode Error')
+            await self._print_msg('ERROR', 'SetBootloaderMode Error')
 
     async def _setNormalMode(self):
         """Reboot device in normal (adb) mode"""
@@ -84,7 +109,7 @@ class Flasher:
                 stdout=subprocess.PIPE
             )
         except Exception:
-            flash_logger.error('SetNormalMode Error')
+            await self._print_msg('ERROR', 'SetNormalMode Error')
 
 
     async def _fastbootFlashAboot(self):
@@ -95,11 +120,11 @@ class Flasher:
                 stderr=asyncio.subprocess.PIPE)
 
             stdout, stderr = await proc.communicate()
-            flash_logger.info(stderr.decode())
-            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+            await self._print_msg('INFO', stderr.decode())
+
             
         except Exception:
-            flash_logger.error('FastbootFlashAboot Error')
+            await self._print_msg('ERROR', 'FastbootFlashAboot Error')
 
     async def _fastbootFlashRpm(self):
         try:
@@ -109,11 +134,10 @@ class Flasher:
                 stderr=asyncio.subprocess.PIPE)
 
             stdout, stderr = await proc.communicate()
-            flash_logger.info(stderr.decode())
-            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+            await self._print_msg('INFO', stderr.decode())
 
         except Exception:
-            flash_logger.error('FastbootFlashRpm Error')
+            await self._print_msg('ERROR', 'FastbootFlashRpm Error')
 
     async def _fastbootFlashSbl(self):
         try:
@@ -123,11 +147,10 @@ class Flasher:
                 stderr=asyncio.subprocess.PIPE)
 
             stdout, stderr = await proc.communicate()
-            flash_logger.info(stderr.decode())
-            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
-
+            await self._print_msg('INFO', stderr.decode())
+    
         except Exception:
-            flash_logger.error('FastbootFlashSbl Error')
+            await self._print_msg('ERROR', 'FastbootFlashSbl Error')
 
     async def _fastbootFlashTz(self):
         try:
@@ -137,11 +160,10 @@ class Flasher:
                 stderr=asyncio.subprocess.PIPE)
 
             stdout, stderr = await proc.communicate()
-            flash_logger.info(stderr.decode())
-            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
-
+            await self._print_msg('INFO', stderr.decode())
+            
         except Exception:
-            flash_logger.error('FastbootFlashTz Error')
+            await self._print_msg('ERROR', 'FastbootFlashTz Error')
 
     async def _fastbootFlashModem(self):
         try:
@@ -151,11 +173,10 @@ class Flasher:
                 stderr=asyncio.subprocess.PIPE)
 
             stdout, stderr = await proc.communicate()
-            flash_logger.info(stderr.decode())
-            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+            await self._print_msg('INFO', stderr.decode())
 
         except Exception:
-            flash_logger.error('FastbootFlashModem Error')
+            await self._print_msg('ERROR', 'FastbootFlashModem Error')
 
     async def _fastbootFlashBoot(self):
         try:
@@ -165,11 +186,10 @@ class Flasher:
                 stderr=asyncio.subprocess.PIPE)
 
             stdout, stderr = await proc.communicate()
-            flash_logger.info(stderr.decode())
-            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+            await self._print_msg('INFO', stderr.decode())
 
         except Exception:
-            flash_logger.error('FastbootFlashBoot Error')
+            await self._print_msg('ERROR', 'FastbootFlashBoot Error')
 
     async def _fastbootFlashSystem(self):
         try:
@@ -179,11 +199,10 @@ class Flasher:
                 stderr=asyncio.subprocess.PIPE)
 
             stdout, stderr = await proc.communicate()
-            flash_logger.info(stderr.decode())
-            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+            await self._print_msg('INFO', stderr.decode())
 
         except Exception:
-            flash_logger.error('FastbootFlashSystem Error')
+            await self._print_msg('ERROR', 'FastbootFlashSystem Error')
 
     async def _fastbootFlash(self):
         await self._fastbootFlashAboot()
@@ -197,49 +216,38 @@ class Flasher:
     async def flashModem(self, comport) -> bool:
         self._port = comport
 
+        # Take on Relay
         gpio.output(RELAY_PIN, gpio.LOW)
+        await self._print_msg('INFO', f'Start flashing {self._port}')
 
-        flash_logger.info(f'Start flashing {self._port}')
-        await self._websocket.send('Log', 'Start Flashing')
-
-
-        await asyncio.sleep(30)
+        # Wait until SIM is Taken On and take on adb
         if not await self._setAdbMode(self._port):
             return False
 
+        # Check until adb device is not foung or 30 sec what is less
+        adb_devices = await self.getAdbDevices()
 
-        for i in range(30):
-            adb_devices = await self.getAdbDevices()
-            if sys.platform.startswith('linux'):
-                adb_devices = adb_devices[0].split('\n')
-        
-            if adb_devices[1] != '':
-                break
-            
-            flash_logger.info(f'Try № {i}')
-            await asyncio.sleep(1)
-
-
+        # if adb was found go next, otherwise return
         if adb_devices[1] == '':
-            flash_logger.error('No ADB device found')
-            await self._websocket.send('Log', 'No ADB device found') 
+            await self._print_msg('ERROR', 'No ADB device found')
             return False
         else:
-            flash_logger.info('ADB device found!')
-            await self._websocket.send('Log', 'ADB device found!') 
+            await self._print_msg('INFO', 'ADB device found!')
 
-
+        # Take on bootloader mode to get ready for flashing
         await self._setBootloaderMode()
         await asyncio.sleep(2)
 
+        # Flash all of the data step by step
         await self._fastbootFlash()
 
+        # Reboot in normal mode
         await self._setNormalMode()
         await asyncio.sleep(5)
 
-        flash_logger.info(f'Stop flashing {self._port}')
-        await self._websocket.send('Log', 'Stop flashing') 
+        await self._print_msg('INFO', f'Stop flashing {self._port}')
 
+        # Take off relay
         gpio.output(RELAY_PIN, gpio.HIGH)
         
         return True
