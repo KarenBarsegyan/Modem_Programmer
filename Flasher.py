@@ -23,6 +23,7 @@ class Flasher:
         
         gpio.setmode(gpio.BCM)
         gpio.setup(RELAY_PIN, gpio.OUT)
+        gpio.output(RELAY_PIN, gpio.HIGH)
 
     def __del__(self):
         gpio.output(RELAY_PIN, gpio.HIGH)
@@ -40,35 +41,27 @@ class Flasher:
             adb_res = []
         return adb_res
 
-    async def getFbDevices(self):
-        try:
-            fb_res = subprocess.Popen(
-                self._config['adb_fastboot_path'] + r'\fastboot devices',
-                shell=True,
-                stdout=subprocess.PIPE
-            ).stdout.read().decode('utf-8').split('\r\n')
-        except Exception:
-            flash_logger.error('GetFbDevices Error')
-            fb_res = []
-        return fb_res
 
     async def _setAdbMode(self, port) -> bool:
         """Set modem ADB mode"""
-        result = False
         try:
             cp = ComPort()
             cp.openPort(port)  # неправильно сделана обработка исключений - пределать
             cp.sendATCommand('at+cusbadb=1')
+            await asyncio.sleep(0.5)
             if 'OK' in cp.getATResponse():
+                cp.sendATCommand('at+creset')
                 flash_logger.info(f'ADB on {port} is taken On succesfully')
-                # await self._websocket.send('Log', 'ADB is taken On succesfully')
+                await self._websocket.send('Log', 'ADB is taken On succesfully')
+                return True
             
-            result = True
-            cp.sendATCommand('at+creset')
-            return result
+            flash_logger.info(f'ADB on {port} was not taken on')
+            await self._websocket.send('Log', 'ADB was not taken on')
+
+            return False
         except Exception:
             flash_logger.info(f'Taking on ADB on {port} ended with error')
-            await self._websocket.send('Log', 'ADB was not taken on with error')
+            await self._websocket.send('Log', 'Taking on ADB ended with error')
             return False
 
     async def _setBootloaderMode(self):
@@ -93,20 +86,6 @@ class Flasher:
         except Exception:
             flash_logger.error('SetNormalMode Error')
 
-    async def _adbReboot(self):
-        try:
-            # subprocess.run(
-            #     self._config['adb_fastboot_path'] + r'\adb reboot ',
-            #     shell=True
-            # )
-            proc = await asyncio.create_subprocess_shell(
-                self._config['adb_fastboot_path'] + r'\adb reboot '
-            )
-                # stdout=asyncio.subprocess.PIPE,
-                # stderr=asyncio.subprocess.PIPE)
-            await proc.wait()
-        except Exception:
-            flash_logger.error('AdbReboot Error')
 
     async def _fastbootFlashAboot(self):
         try:
@@ -224,15 +203,23 @@ class Flasher:
         await self._websocket.send('Log', 'Start Flashing')
 
 
-        await asyncio.sleep(15)
+        await asyncio.sleep(30)
         if not await self._setAdbMode(self._port):
             return False
-        await asyncio.sleep(20)
 
-        adb_devices = await self.getAdbDevices()
-        if sys.platform.startswith('linux'):
-            adb_devices = adb_devices[0].split('\n')
+
+        for i in range(30):
+            adb_devices = await self.getAdbDevices()
+            if sys.platform.startswith('linux'):
+                adb_devices = adb_devices[0].split('\n')
         
+            if adb_devices[1] != '':
+                break
+            
+            flash_logger.info(f'Try № {i}')
+            await asyncio.sleep(1)
+
+
         if adb_devices[1] == '':
             flash_logger.error('No ADB device found')
             await self._websocket.send('Log', 'No ADB device found') 
@@ -240,6 +227,7 @@ class Flasher:
         else:
             flash_logger.info('ADB device found!')
             await self._websocket.send('Log', 'ADB device found!') 
+
 
         await self._setBootloaderMode()
         await asyncio.sleep(2)
