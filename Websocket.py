@@ -8,7 +8,7 @@ ws_logger = logging.getLogger(__name__)
 # Set logging level
 ws_logger.setLevel(logging.ERROR)
 ws_log_hndl = logging.StreamHandler(stream=sys.stdout)
-ws_log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] %(message)s'))
+ws_log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] "%(message)s" \t\t- %(filename)s:%(lineno)s - %(asctime)s'))
 ws_logger.addHandler(ws_log_hndl)
 
 class WebSocketServer():
@@ -83,7 +83,7 @@ class WebSocketServer():
             ws_logger.info("raise ConnectionClosedOK in send")
             raise self.ConnectionClosedOk
         except:
-            ws_logger.info("raise ConnectionClosedError in send")
+            ws_logger.error("raise ConnectionClosedError in send")
             raise self.ConnectionClosedError
         # finally:
         #     ws_logger.info("finally in send")
@@ -95,10 +95,10 @@ class WebSocketServer():
             rx_data = json.loads(await self._websocket.recv())
             return rx_data['cmd'], rx_data['msg']
         except websockets.ConnectionClosedOK:
-            ws_logger.info("raise ConnectionClosedOK in recv")
+            ws_logger.info("Raise ConnectionClosedOK in recv")
             raise self.ConnectionClosedOk
         except:
-            ws_logger.info("raise ConnectionClosedError in recv")
+            ws_logger.error("Raise ConnectionClosedError in recv")
             raise self.ConnectionClosedError
         # finally:
         #     ws_logger.info("finally in recv")

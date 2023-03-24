@@ -2,14 +2,31 @@ import sys
 import yaml
 import subprocess
 from ComPort import ComPort
-import json
+import logging
 import asyncio
+import RPi.GPIO as gpio
 
+flash_logger = logging.getLogger(__name__)
+# Set logging level
+flash_logger.setLevel(logging.INFO)
+flash_log_hndl = logging.StreamHandler(stream=sys.stdout)
+flash_log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] "%(message)s" \t\t- %(filename)s:%(lineno)s - %(asctime)s'))
+flash_logger.addHandler(flash_log_hndl)
+
+RELAY_PIN = 21
 
 class Flasher:
-    def __init__(self):
+    def __init__(self, websocket):
         self._flash_thread = None
+        self._websocket = websocket
         self._config = yaml.load(open('configuration.yml', 'r'), yaml.SafeLoader)
+        
+        gpio.setmode(gpio.BCM)
+        gpio.setup(RELAY_PIN, gpio.OUT)
+
+    def __del__(self):
+        gpio.output(RELAY_PIN, gpio.HIGH)
+        gpio.cleanup()
 
     async def getAdbDevices(self):
         try:
@@ -19,7 +36,7 @@ class Flasher:
                 stdout=subprocess.PIPE
             ).stdout.read().decode('utf-8').split('\r\n')
         except Exception:
-            print('Exception occurred!')
+            flash_logger.error('GetAdbDevices Error')
             adb_res = []
         return adb_res
 
@@ -31,21 +48,28 @@ class Flasher:
                 stdout=subprocess.PIPE
             ).stdout.read().decode('utf-8').split('\r\n')
         except Exception:
-            print('Exception occurred!')
+            flash_logger.error('GetFbDevices Error')
             fb_res = []
         return fb_res
 
-    async def _setAdbMode(self, port):
+    async def _setAdbMode(self, port) -> bool:
         """Set modem ADB mode"""
+        result = False
         try:
             cp = ComPort()
             cp.openPort(port)  # неправильно сделана обработка исключений - пределать
             cp.sendATCommand('at+cusbadb=1')
             if 'OK' in cp.getATResponse():
-                print(f'ADB на {port} включился успешно')
+                flash_logger.info(f'ADB on {port} is taken On succesfully')
+                # await self._websocket.send('Log', 'ADB is taken On succesfully')
+            
+            result = True
             cp.sendATCommand('at+creset')
+            return result
         except Exception:
-            print(f'Включение ADB на {port} не удалось')
+            flash_logger.info(f'Taking on ADB on {port} ended with error')
+            await self._websocket.send('Log', 'ADB was not taken on with error')
+            return False
 
     async def _setBootloaderMode(self):
         """Reboot device in bootloader (fastboot) mode"""
@@ -56,7 +80,7 @@ class Flasher:
                 stdout=subprocess.PIPE
             )
         except Exception:
-            print('Couldn\'t reboot in fastboot mode!')
+            flash_logger.error('SetBootloaderMode Error')
 
     async def _setNormalMode(self):
         """Reboot device in normal (adb) mode"""
@@ -67,103 +91,142 @@ class Flasher:
                 stdout=subprocess.PIPE
             )
         except Exception:
-            print('Couldn\'t reboot in adb mode!')
+            flash_logger.error('SetNormalMode Error')
 
     async def _adbReboot(self):
         try:
-            subprocess.run(
-                self._config['adb_fastboot_path'] + r'\adb reboot ',
-                shell=True
+            # subprocess.run(
+            #     self._config['adb_fastboot_path'] + r'\adb reboot ',
+            #     shell=True
+            # )
+            proc = await asyncio.create_subprocess_shell(
+                self._config['adb_fastboot_path'] + r'\adb reboot '
             )
+                # stdout=asyncio.subprocess.PIPE,
+                # stderr=asyncio.subprocess.PIPE)
+            await proc.wait()
         except Exception:
-            print('Couldn\'t reboot adb!')
+            flash_logger.error('AdbReboot Error')
 
     async def _fastbootFlashAboot(self):
         try:
-            subprocess.run(
+            proc = await asyncio.create_subprocess_shell(
                 self._config['adb_fastboot_path'] + r'\fastboot flash aboot ' + self._config['fw_path'] + r'\appsboot.mbn',
-                shell=True
-            )
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE)
+
+            stdout, stderr = await proc.communicate()
+            flash_logger.info(stderr.decode())
+            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+            
         except Exception:
-            print('Couldn\'t flash aboot!')
+            flash_logger.error('FastbootFlashAboot Error')
 
     async def _fastbootFlashRpm(self):
         try:
-            subprocess.run(
+            proc = await asyncio.create_subprocess_shell(
                 self._config['adb_fastboot_path'] + r'\fastboot flash rpm ' + self._config['fw_path'] + r'\rpm.mbn',
-                shell=True
-            )
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE)
+
+            stdout, stderr = await proc.communicate()
+            flash_logger.info(stderr.decode())
+            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+
         except Exception:
-            print('Couldn\'t flash rpm!')
+            flash_logger.error('FastbootFlashRpm Error')
 
     async def _fastbootFlashSbl(self):
         try:
-            subprocess.run(
+            proc = await asyncio.create_subprocess_shell(
                 self._config['adb_fastboot_path'] + r'\fastboot flash sbl ' + self._config['fw_path'] + r'\sbl1.mbn',
-                shell=True
-            )
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE)
+
+            stdout, stderr = await proc.communicate()
+            flash_logger.info(stderr.decode())
+            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+
         except Exception:
-            print('Couldn\'t flash sbl!')
+            flash_logger.error('FastbootFlashSbl Error')
 
     async def _fastbootFlashTz(self):
         try:
-            subprocess.run(
+            proc = await asyncio.create_subprocess_shell(
                 self._config['adb_fastboot_path'] + r'\fastboot flash tz ' + self._config['fw_path'] + r'\tz.mbn',
-                shell=True
-            )
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE)
+
+            stdout, stderr = await proc.communicate()
+            flash_logger.info(stderr.decode())
+            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+
         except Exception:
-            print('Couldn\'t flash tz!')
+            flash_logger.error('FastbootFlashTz Error')
 
     async def _fastbootFlashModem(self):
         try:
-            subprocess.run(
+            proc = await asyncio.create_subprocess_shell(
                 self._config['adb_fastboot_path'] + r'\fastboot flash modem ' + self._config['fw_path'] + r'\modem.img',
-                shell=True
-            )
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE)
+
+            stdout, stderr = await proc.communicate()
+            flash_logger.info(stderr.decode())
+            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+
         except Exception:
-            print('Couldn\'t flash modem!')
+            flash_logger.error('FastbootFlashModem Error')
 
     async def _fastbootFlashBoot(self):
         try:
-            subprocess.run(
+            proc = await asyncio.create_subprocess_shell(
                 self._config['adb_fastboot_path'] + r'\fastboot flash boot ' + self._config['fw_path'] + r'\boot.img',
-                shell=True
-            )
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE)
+
+            stdout, stderr = await proc.communicate()
+            flash_logger.info(stderr.decode())
+            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+
         except Exception:
-            print('Couldn\'t flash boot!')
+            flash_logger.error('FastbootFlashBoot Error')
 
     async def _fastbootFlashSystem(self):
         try:
-            subprocess.run(
+            proc = await asyncio.create_subprocess_shell(
                 self._config['adb_fastboot_path'] + r'\fastboot flash system ' + self._config['fw_path'] + r'\system.img',
-                shell=True
-            )
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE)
+
+            stdout, stderr = await proc.communicate()
+            flash_logger.info(stderr.decode())
+            await self._websocket.send('Log', f'  stdout [:\n{stderr.decode()}  ] end stdout')
+
         except Exception:
-            print('Couldn\'t flash system!')
+            flash_logger.error('FastbootFlashSystem Error')
 
-    async def _fastbootFlash(self, websocket):
+    async def _fastbootFlash(self):
         await self._fastbootFlashAboot()
-        await websocket.send('Log', 'FlashAboot Done')
         await self._fastbootFlashRpm()
-        await websocket.send('Log', 'FlashRpm Done')
         await self._fastbootFlashSbl()
-        await websocket.send('Log', 'FlashSbl Done')
         await self._fastbootFlashTz()
-        await websocket.send('Log', 'FlashTz Done')
         await self._fastbootFlashModem()
-        await websocket.send('Log', 'FlashModem Done')
         await self._fastbootFlashBoot()
-        await websocket.send('Log', 'FlashBoot Done')
         await self._fastbootFlashSystem()
-        await websocket.send('Log', 'FlashSystem Done')
 
-    async def flashModem(self, comport, websocket) -> bool:
+    async def flashModem(self, comport) -> bool:
         self._port = comport
 
-        print(f'Start flashing {self._port}')
-        await websocket.send('Log', 'Start Flashing')
+        gpio.output(RELAY_PIN, gpio.LOW)
 
-        await self._setAdbMode(self._port)
+        flash_logger.info(f'Start flashing {self._port}')
+        await self._websocket.send('Log', 'Start Flashing')
+
+
+        await asyncio.sleep(15)
+        if not await self._setAdbMode(self._port):
+            return False
         await asyncio.sleep(20)
 
         adb_devices = await self.getAdbDevices()
@@ -171,52 +234,27 @@ class Flasher:
             adb_devices = adb_devices[0].split('\n')
         
         if adb_devices[1] == '':
-            print('No ADB device found')
-            await websocket.send('Log', 'No ADB device found') 
+            flash_logger.error('No ADB device found')
+            await self._websocket.send('Log', 'No ADB device found') 
             return False
         else:
-            await websocket.send('Log', 'ADB device found!') 
+            flash_logger.info('ADB device found!')
+            await self._websocket.send('Log', 'ADB device found!') 
 
         await self._setBootloaderMode()
         await asyncio.sleep(2)
 
-        await self._fastbootFlash(websocket)
+        await self._fastbootFlash()
 
         await self._setNormalMode()
         await asyncio.sleep(5)
 
-        print(f'Stop flashing {self._port}')
-        await websocket.send('Log', 'Stop flashing') 
+        flash_logger.info(f'Stop flashing {self._port}')
+        await self._websocket.send('Log', 'Stop flashing') 
 
+        gpio.output(RELAY_PIN, gpio.HIGH)
+        
         return True
-
-
-# class _FlasherThread():
-#     def __init__(self, comport=''):
-#         self._flasher = Flasher()
-#         self._port = comport
-
-#     def run(self) -> None:
-#         print(f'Start flashing {self._port}')
-#         self._flasher._setAdbMode(self._port)
-#         QThread.sleep(25)
-
-#         adb_devices = self._flasher.getAdbDevices()
-#         print(adb_devices)
-#         if adb_devices[1] == '':
-#             print('Прошивка не удалась, выход')
-#             return
-
-#         self._flasher._setBootloaderMode()
-#         QThread.sleep(2)  # временные промежутки нужно изменить (подправить под оптимальные)
-
-#         self._flasher._fastbootFlash()
-
-#         self._flasher._setNormalMode()
-#         QThread.sleep(5)
-
-#         print(f'Stop flashing {self._port}')
-
 
 
 if __name__ == '__main__':
