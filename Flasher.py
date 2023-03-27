@@ -35,10 +35,8 @@ class Flasher:
         return self
     
     async def __aexit__(self, type, value, traceback):
-        flash_logger.info("_aexit")
         gpio.output(RELAY_PIN, gpio.HIGH)
         gpio.cleanup()
-        flash_logger.info("_aexit_end")
         return True
 
     async def _print_msg(self, level: str, msg: str):
