@@ -25,7 +25,8 @@ async def main_thread(ws_server):
             if cmd == 'Start Flashing':
                 main_logger.info("Flash Started")
                 await ws_server.send('Start Flashing', 'Ok')
-
+                # await asyncio.sleep(2)
+                # await ws_server.send('End Flashing', 'Ok')
                 if await flasher.flashModem('/dev/ttyUSB2'):
                     await ws_server.send('End Flashing', 'Ok')
                 else:
@@ -40,20 +41,27 @@ async def main_thread(ws_server):
 
 
 async def main():
-
     main_logger.info("STARTING")
 
-    while True:
-        async with WebSocketServer(ip = '0.0.0.0', port = 8000) as ws_server:
+    async with WebSocketServer(ip = '0.0.0.0', port = 8000) as ws_server:
+        try:
             await main_thread(ws_server)
+        except: 
+            main_logger.error("Main_thread Error")
 
-        main_logger.info("Ended async with loop")
+    main_logger.info("Ended async with loop")
+
     
 
 if __name__ == '__main__':
-    # try:
-    asyncio.run(main())
-    # except:
-    #     gpio.cleanup()
-    #     print("End with error")
+    while True:
+        try:
+            asyncio.run(main())
+
+        except KeyboardInterrupt:
+            main_logger.info('Keyboard Int In Main')
+            break
+        except:
+            main_logger.error('Unknown Int In Main')
+
 

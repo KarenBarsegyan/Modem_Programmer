@@ -10,7 +10,7 @@ flash_logger = logging.getLogger(__name__)
 # Set logging level
 flash_logger.setLevel(logging.INFO)
 flash_log_hndl = logging.StreamHandler(stream=sys.stdout)
-flash_log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] "%(message)s" \t\t- %(filename)s:%(lineno)s - %(asctime)s'))
+flash_log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] "%(message)s"'))
 flash_logger.addHandler(flash_log_hndl)
 
 RELAY_PIN = 21
@@ -78,7 +78,7 @@ class Flasher:
                 await asyncio.sleep(0.5)
                 if 'OK' in cp.getATResponse():
                     cp.sendATCommand('at+creset')
-                    await self._print_msg('INFO', f'ADB on {port} is taken On succesfully')
+                    await self._print_msg('INFO', f'ADB on {port} is taken on succesfully')
                     return True
             
             except Exception: pass

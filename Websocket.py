@@ -6,7 +6,7 @@ import sys
 
 ws_logger = logging.getLogger(__name__)
 # Set logging level
-ws_logger.setLevel(logging.ERROR)
+ws_logger.setLevel(logging.INFO)
 ws_log_hndl = logging.StreamHandler(stream=sys.stdout)
 ws_log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] "%(message)s" \t\t- %(filename)s:%(lineno)s - %(asctime)s'))
 ws_logger.addHandler(ws_log_hndl)
@@ -37,10 +37,9 @@ class WebSocketServer():
     
     async def __aexit__(self, *args):
         ws_logger.info("_aexit")
-        self._is_conn_established = False
         self._server_manager.close()
         await self._server_manager.wait_closed()
-        ws_logger.info("_aexit now its closed")
+        ws_logger.info("_aexit: now its closed")
 
     async def _connected_handler(self, websocket):
         if self._is_conn_established == True:
@@ -62,11 +61,10 @@ class WebSocketServer():
             try:
                 await self.send('Ping', '')
             except:
-                ws_logger.error("Connection Hndlr Error")
+                ws_logger.error("Connection Ping Error")
                 break
 
-            await asyncio.sleep(1)
-
+            await asyncio.sleep(0.5)
 
     async def _ws_is_connected(self):
         while not self._is_conn_established:
@@ -79,28 +77,23 @@ class WebSocketServer():
             await self._websocket.send(
                 json.dumps({'cmd': cmd, 'msg': msg})
             )
+            
         except websockets.ConnectionClosedOK:
             ws_logger.info("raise ConnectionClosedOK in send")
             raise self.ConnectionClosedOk
         except:
             ws_logger.error("raise ConnectionClosedError in send")
             raise self.ConnectionClosedError
-        # finally:
-        #     ws_logger.info("finally in send")
-        #     self._server_manager.is_close()
 
     async def receive(self):
         await self._ws_is_connected()
         try:
             rx_data = json.loads(await self._websocket.recv())
             return rx_data['cmd'], rx_data['msg']
+        
         except websockets.ConnectionClosedOK:
             ws_logger.info("Raise ConnectionClosedOK in recv")
             raise self.ConnectionClosedOk
         except:
             ws_logger.error("Raise ConnectionClosedError in recv")
             raise self.ConnectionClosedError
-        # finally:
-        #     ws_logger.info("finally in recv")
-        #     self._server_manager.is_close()
-
