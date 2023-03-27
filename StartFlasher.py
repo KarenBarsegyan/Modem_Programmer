@@ -3,6 +3,7 @@ from Flasher import Flasher
 from Websocket import WebSocketServer
 import logging
 import sys
+import signal
 
 
 main_logger = logging.getLogger(__name__)
@@ -49,19 +50,26 @@ async def main():
         except: 
             main_logger.error("Main_thread Error")
 
-    main_logger.info("Ended async with loop")
+        main_logger.info("Ended async with loop")
 
-    
+
+def sigint_handler(signum, frame):
+    main_logger.info('Ctrl+C was pressed')
+    loop = asyncio.get_event_loop()
+    loop.stop()
+   
+
+signal.signal(signal.SIGINT, sigint_handler) 
 
 if __name__ == '__main__':
-    while True:
-        try:
-            asyncio.run(main())
-
-        except KeyboardInterrupt:
-            main_logger.info('Keyboard Int In Main')
-            break
-        except:
-            main_logger.error('Unknown Int In Main')
+    try:
+        asyncio.run(main())
+    except:
+        main_logger.error('Unknown Int In Main')
+    # finally:
+    #     loop = asyncio.get_running_loop()
+    #     loop.stop()
+        
+        
 
 
