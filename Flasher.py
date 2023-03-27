@@ -25,9 +25,21 @@ class Flasher:
         gpio.setup(RELAY_PIN, gpio.OUT)
         gpio.output(RELAY_PIN, gpio.HIGH)
 
-    def __del__(self):
+    def __await__(self):
+        async def closure():
+            return self
+        return closure().__await__()
+    
+    async def __aenter__(self):
+        await self
+        return self
+    
+    async def __aexit__(self, type, value, traceback):
+        flash_logger.info("_aexit")
         gpio.output(RELAY_PIN, gpio.HIGH)
         gpio.cleanup()
+        flash_logger.info("_aexit_end")
+        return True
 
     async def _print_msg(self, level: str, msg: str):
         if level == 'INFO':

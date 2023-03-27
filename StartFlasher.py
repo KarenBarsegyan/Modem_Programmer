@@ -4,6 +4,7 @@ from Websocket import WebSocketServer
 import logging
 import sys
 import signal
+import RPi.GPIO as gpio
 
 
 main_logger = logging.getLogger(__name__)
@@ -13,9 +14,8 @@ main_log_hndl = logging.StreamHandler(stream=sys.stdout)
 main_log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] "%(message)s" \t\t- %(filename)s:%(lineno)s - %(asctime)s'))
 main_logger.addHandler(main_log_hndl)
 
-async def main_thread(ws_server):
+async def main_thread(ws_server, flasher):
     main_logger.info("Main Thread")
-    flasher = Flasher(ws_server)
 
     while True:
         try:
@@ -35,41 +35,47 @@ async def main_thread(ws_server):
 
         except WebSocketServer.ConnectionClosedOk:
             main_logger.info("End of connection")
+        except WebSocketServer.ConnectionClosedError:
+            main_logger.warning("End of connection with ERROR")
+        except asyncio.CancelledError:
+            main_logger.info("Main thread task was canceled")
+        finally:
             break
-        except:
-            main_logger.error("End of connection with ERROR")
-            raise
 
 
 async def main():
     main_logger.info("STARTING")
-
-    async with WebSocketServer(ip = '0.0.0.0', port = 8000) as ws_server:
-        try:
-            await main_thread(ws_server)
-        except: 
-            main_logger.error("Main_thread Error")
-
-        main_logger.info("Ended async with loop")
+    while True:
+        async with WebSocketServer(ip = '0.0.0.0', port = 8000) as ws_server, Flasher(ws_server) as flasher:
+            await main_thread(ws_server, flasher)
+            main_logger.info("Ended async with loop")
 
 
 def sigint_handler(signum, frame):
     main_logger.info('Ctrl+C was pressed')
-    loop = asyncio.get_event_loop()
-    loop.stop()
-   
+
+    tasks = asyncio.all_tasks()
+    for task in tasks:
+        task.cancel()
+
+    loop = asyncio.get_running_loop()
+
+    try:
+        loop.stop()
+        main_logger.info('Loop stopped')
+    except:
+        main_logger.info('Loop stopping error')
+
 
 signal.signal(signal.SIGINT, sigint_handler) 
 
+
 if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
     try:
-        asyncio.run(main())
+        loop.run_until_complete(main())
     except:
-        main_logger.error('Unknown Int In Main')
-    # finally:
-    #     loop = asyncio.get_running_loop()
-    #     loop.stop()
-        
+        main_logger.info('_Main_ ended')
         
 
 

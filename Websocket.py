@@ -3,6 +3,7 @@ import logging
 import websockets
 import json
 import sys
+import signal
 
 ws_logger = logging.getLogger(__name__)
 # Set logging level
@@ -18,6 +19,7 @@ class WebSocketServer():
 
     class ConnectionClosedError(Exception):
         pass
+
 
     def __init__(self, ip, port):
         self._ip = ip
@@ -37,23 +39,28 @@ class WebSocketServer():
     
     async def __aexit__(self, *args):
         ws_logger.info("_aexit")
+
+        self._is_conn_established = False
         self._server_manager.close()
         await self._server_manager.wait_closed()
+
         ws_logger.info("_aexit: now its closed")
+
+        return True
 
     async def _connected_handler(self, websocket):
         if self._is_conn_established == True:
             return
         self._websocket = websocket
         self._is_conn_established = True
-        loop = asyncio.get_running_loop()
-        loop.create_task(self._ping())
+        ping_task = asyncio.ensure_future(self._ping())
 
         ws_logger.info("Handler Start")
 
         while self._server_manager.is_serving():
             await asyncio.sleep(0)
         
+        ping_task.cancel()
         ws_logger.info("End while is serving")
 
     async def _ping(self):
@@ -61,7 +68,7 @@ class WebSocketServer():
             try:
                 await self.send('Ping', '')
             except:
-                ws_logger.error("Connection Ping Error")
+                ws_logger.warning("Connection Ping Error")
                 break
 
             await asyncio.sleep(0.5)
@@ -85,6 +92,7 @@ class WebSocketServer():
             ws_logger.error("raise ConnectionClosedError in send")
             raise self.ConnectionClosedError
 
+
     async def receive(self):
         await self._ws_is_connected()
         try:
@@ -97,3 +105,4 @@ class WebSocketServer():
         except:
             ws_logger.error("Raise ConnectionClosedError in recv")
             raise self.ConnectionClosedError
+
