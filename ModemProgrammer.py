@@ -81,10 +81,8 @@ def sigint_handler(signum, frame):
     except:
         main_logger.info('Loop stopping error')
 
-    try:
-        gpio.cleanup()
-    except:
-        pass
+    gpio.setwarnings(False)
+    gpio.cleanup()
 
 # Take on ctrl+c press catch
 signal.signal(signal.SIGINT, sigint_handler) 
@@ -99,10 +97,4 @@ if __name__ == '__main__':
     except:
         # If error occurs and loop stops program drops here
         main_logger.info('_Main_ ended')
-        
-# New version pkg cmd
-
-# pyinstaller --onefile -w ModemProgrammer.py
-# cp dist/ModemProgrammer modem-programmer_pkg/usr/bin/ModemProgrammer 
-# dpfg --build modem-programmer_pkg
 
