@@ -1,5 +1,4 @@
 import sys
-import yaml
 import subprocess
 from ComPort import ComPort
 import logging
@@ -19,7 +18,9 @@ class Flasher:
     def __init__(self, websocket):
         self._flash_thread = None
         self._websocket = websocket
-        self._config = yaml.load(open('configuration.yml', 'r'), yaml.SafeLoader)
+
+        self._adb_fastboot_path = '/usr/lib/android-sdk/platform-tools/'
+        self._fw_path = '/home/pi/Work/Modem_Programmer/FlashData/LE11B14SIM7600M22_211104/'
         
         gpio.setmode(gpio.BCM)
         gpio.setup(RELAY_PIN, gpio.OUT)
@@ -59,7 +60,7 @@ class Flasher:
         for i in range(30):
             try:
                 adb_res = subprocess.Popen(
-                    self._config['adb_fastboot_path'] + r'\adb devices',
+                    self._adb_fastboot_path + r'\adb devices',
                     shell=True,
                     stdout=subprocess.PIPE
                 ).stdout.read().decode('utf-8').split('\r\n')
@@ -103,7 +104,7 @@ class Flasher:
         """Reboot device in bootloader (fastboot) mode"""
         try:
             subprocess.Popen(
-                self._config['adb_fastboot_path'] + r'\adb reboot bootloader',
+                self._adb_fastboot_path + r'\adb reboot bootloader',
                 shell=True,
                 stdout=subprocess.PIPE
             )
@@ -114,7 +115,7 @@ class Flasher:
         """Reboot device in normal (adb) mode"""
         try:
             subprocess.Popen(
-                self._config['adb_fastboot_path'] + r'\fastboot reboot',
+                self._adb_fastboot_path + r'\fastboot reboot',
                 shell=True,
                 stdout=subprocess.PIPE
             )
@@ -125,7 +126,7 @@ class Flasher:
     async def _fastbootFlashAboot(self):
         try:
             proc = await asyncio.create_subprocess_shell(
-                self._config['adb_fastboot_path'] + r'\fastboot flash aboot ' + self._config['fw_path'] + r'\appsboot.mbn',
+                self._adb_fastboot_path + r'\fastboot flash aboot ' + self._fw_path + r'\appsboot.mbn',
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE)
 
@@ -139,7 +140,7 @@ class Flasher:
     async def _fastbootFlashRpm(self):
         try:
             proc = await asyncio.create_subprocess_shell(
-                self._config['adb_fastboot_path'] + r'\fastboot flash rpm ' + self._config['fw_path'] + r'\rpm.mbn',
+                self._adb_fastboot_path + r'\fastboot flash rpm ' + self._fw_path + r'\rpm.mbn',
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE)
 
@@ -152,7 +153,7 @@ class Flasher:
     async def _fastbootFlashSbl(self):
         try:
             proc = await asyncio.create_subprocess_shell(
-                self._config['adb_fastboot_path'] + r'\fastboot flash sbl ' + self._config['fw_path'] + r'\sbl1.mbn',
+                self._adb_fastboot_path + r'\fastboot flash sbl ' + self._fw_path + r'\sbl1.mbn',
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE)
 
@@ -165,7 +166,7 @@ class Flasher:
     async def _fastbootFlashTz(self):
         try:
             proc = await asyncio.create_subprocess_shell(
-                self._config['adb_fastboot_path'] + r'\fastboot flash tz ' + self._config['fw_path'] + r'\tz.mbn',
+                self._adb_fastboot_path + r'\fastboot flash tz ' + self._fw_path + r'\tz.mbn',
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE)
 
@@ -178,7 +179,7 @@ class Flasher:
     async def _fastbootFlashModem(self):
         try:
             proc = await asyncio.create_subprocess_shell(
-                self._config['adb_fastboot_path'] + r'\fastboot flash modem ' + self._config['fw_path'] + r'\modem.img',
+                self._adb_fastboot_path + r'\fastboot flash modem ' + self._fw_path + r'\modem.img',
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE)
 
@@ -191,7 +192,7 @@ class Flasher:
     async def _fastbootFlashBoot(self):
         try:
             proc = await asyncio.create_subprocess_shell(
-                self._config['adb_fastboot_path'] + r'\fastboot flash boot ' + self._config['fw_path'] + r'\boot.img',
+                self._adb_fastboot_path + r'\fastboot flash boot ' + self._fw_path + r'\boot.img',
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE)
 
@@ -204,7 +205,7 @@ class Flasher:
     async def _fastbootFlashSystem(self):
         try:
             proc = await asyncio.create_subprocess_shell(
-                self._config['adb_fastboot_path'] + r'\fastboot flash system ' + self._config['fw_path'] + r'\system.img',
+                self._adb_fastboot_path + r'\fastboot flash system ' + self._fw_path + r'\system.img',
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE)
 

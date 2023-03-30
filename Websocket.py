@@ -3,7 +3,6 @@ import logging
 import websockets
 import json
 import sys
-import signal
 
 ws_logger = logging.getLogger(__name__)
 # Set logging level

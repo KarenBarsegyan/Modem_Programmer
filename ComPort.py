@@ -1,23 +1,23 @@
 import sys
-import yaml
 import serial
 from serial.tools.list_ports import comports
 
 class ComPort:
     def __init__(self):
         self._com = serial.Serial()
-        self._config = yaml.load(open("configuration.yml"), yaml.SafeLoader)
+        self._com_name_win = ''
+        self._com_name_linux = ''
 
     def getPortsList(self) -> list:
         result = []
         for port in serial.tools.list_ports.comports():
             desc = str(port.description)
             if sys.platform.startswith('win'):
-                if desc.find(self._config['com_name_win']) >= 0: 
+                if desc.find(self._com_name_win) >= 0: 
                     result.append(str(port.name))  
             
             elif sys.platform.startswith('linux'):
-                if desc.find(self._config['com_name_linux']) >= 0: 
+                if desc.find(self._com_name_linux) >= 0: 
                     result.append(str(port.name)) 
 
         return sorted(result)
