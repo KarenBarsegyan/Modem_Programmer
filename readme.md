@@ -25,7 +25,6 @@ Next you will see 3 sections:
     ``` bash
     cd /media/sd/rootfs/etc
     nano dhcpcd.conf
-
     ```
 3. Add static IP settings in the end of file. N depends on current RPI number. Use numbers from 2 to 254
     
