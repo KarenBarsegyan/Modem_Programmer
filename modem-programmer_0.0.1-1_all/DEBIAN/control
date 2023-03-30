@@ -1,7 +1,6 @@
-Package: ModemFlasher
+Package: ModemProgrammer
 Version: 0.0.1
 Maintainer: karen.barsegyan-2001@bk.ru
 Depends: libc6
 Architecture: all
-Homepage: http://example.com
 Description: SIM76 Flasher
