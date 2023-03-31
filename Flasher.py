@@ -1,16 +1,13 @@
 import sys
 import subprocess
 from ComPort import ComPort
-import logging
+from logger import logger
 import asyncio
 import RPi.GPIO as gpio
 
-flash_logger = logging.getLogger(__name__)
-# Set logging level
-flash_logger.setLevel(logging.INFO)
-flash_log_hndl = logging.StreamHandler(stream=sys.stdout)
-flash_log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] "%(message)s"'))
-flash_logger.addHandler(flash_log_hndl)
+
+log = logger(__name__, logger.INFO)
+
 
 RELAY_PIN = 21
 
@@ -42,15 +39,15 @@ class Flasher:
 
     async def _print_msg(self, level: str, msg: str):
         if level == 'INFO':
-            flash_logger.info(msg)
+            log.info(msg)
             await self._websocket.send('Log', msg)
 
         elif level == 'WARNING':
-            flash_logger.warning(msg)
+            log.warning(msg)
             await self._websocket.send('Log', msg)
 
         elif level == 'ERROR':
-            flash_logger.error(msg)
+            log.error(msg)
             await self._websocket.send('Log', msg)
 
         else:
