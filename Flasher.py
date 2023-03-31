@@ -39,15 +39,15 @@ class Flasher:
 
     async def _print_msg(self, level: str, msg: str):
         if level == 'INFO':
-            log.info(msg)
+            log.info_no_lineo(msg, str(sys._getframe(1).f_lineno))
             await self._websocket.send('Log', msg)
 
         elif level == 'WARNING':
-            log.warning(msg)
+            log.warning_no_lineo(msg, str(sys._getframe(1).f_lineno))
             await self._websocket.send('Log', msg)
 
         elif level == 'ERROR':
-            log.error(msg)
+            log.error_no_lineo(msg, str(sys._getframe(1).f_lineno))
             await self._websocket.send('Log', msg)
 
         else:
