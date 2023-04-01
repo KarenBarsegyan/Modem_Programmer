@@ -20,6 +20,10 @@ class logger():
         self._logger.setLevel(level)
 
         try:
+            os.mkdir(f"log")
+        except: pass
+
+        try:
             os.remove(f"log/{name}.log")
         except: pass
         
@@ -32,31 +36,37 @@ class logger():
         self._indent = indent
 
     def info(self, msg: str):
-        self._logger.info   (msg + ' ' * (self._indent - len(msg) - len('info')) + 
+        self._logger.info   (('%.*s' % (self._indent - len('info'), msg)) + ' ' * (self._indent - len(msg) - len('info')) + 
                              str(sys._getframe(1).f_globals['__file__']) + 
                              ':' + str(sys._getframe(1).f_lineno))
     
     def warning(self, msg: str):
-        self._logger.warning(msg + ' ' * (self._indent - len(msg) - len('warning')) + 
+        self._logger.warning(('%.*s' % (self._indent - len('warning'), msg)) + ' ' * (self._indent - len(msg) - len('warning')) + 
                              str(sys._getframe(1).f_globals['__file__']) + 
                              ':' + str(sys._getframe(1).f_lineno))
 
     def error(self, msg: str):
-        self._logger.error  (msg + ' ' * (self._indent - len(msg) - len('error')) + 
+        self._logger.error  (('%.*s' % (self._indent - len('error'), msg)) + ' ' * (self._indent - len(msg) - len('error')) + 
                              str(sys._getframe(1).f_globals['__file__']) + 
                              ':' + str(sys._getframe(1).f_lineno))
 
     def info_no_lineo(self, msg: str, line: int):
-        self._logger.info   (msg + ' ' * (self._indent - len(msg) - len('info')) + 
+        self._logger.info   (('%.*s' % (self._indent - len('info'), msg)) + ' ' * (self._indent - len(msg) - len('info')) + 
                              str(sys._getframe(1).f_globals['__file__']) + 
                              ':' + str(line))
     
     def warning_no_lineo(self, msg: str, line: int):
-        self._logger.warning(msg + ' ' * (self._indent - len(msg) - len('warning')) + 
+        self._logger.warning(('%.*s' % (self._indent - len('warning'), msg)) + ' ' * (self._indent - len(msg) - len('warning')) + 
                              str(sys._getframe(1).f_globals['__file__']) + 
                              ':' + str(line))
 
     def error_no_lineo(self, msg: str, line: int):
-        self._logger.error  (msg + ' ' * (self._indent - len(msg) - len('error')) + 
+        self._logger.error  (('%.*s' % (self._indent - len('error'), msg)) + ' ' * (self._indent - len(msg) - len('error')) + 
                              str(sys._getframe(1).f_globals['__file__']) + 
                              ':' + str(line))
+
+
+if __name__ == '__main__':
+    log = logger(__name__, logger.INFO)
+
+    log.info('Check MSG')
