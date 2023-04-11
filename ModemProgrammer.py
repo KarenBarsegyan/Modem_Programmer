@@ -1,11 +1,10 @@
 import asyncio
 from Flasher import Flasher
-from Websocket import WebSocketServer
-from logger import logger
+from Websocket import WebSocketServer, logger
 import signal
 import RPi.GPIO as gpio
 
-log = logger('ModemProgrammer', logger.INFO)
+log = logger('ModemProgrammer', logger.WARNING)
 
 async def main_thread(ws_server, flasher):
     log.info("Main Thread")
