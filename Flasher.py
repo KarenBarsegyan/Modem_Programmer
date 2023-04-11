@@ -15,7 +15,7 @@ class Flasher:
         self._websocket = websocket
 
         self._adb_fastboot_path = '/usr/lib/android-sdk/platform-tools/'
-        self._fw_path = '/home/pi/Work/Modem_Programmer/FlashData/LE11B14SIM7600M22_211104/'
+        self._fw_path = '/home/pi/FlashData/LE11B14SIM7600M22_211104/'
         
         gpio.setmode(gpio.BCM)
         gpio.setup(RELAY_PIN, gpio.OUT)
