@@ -1,24 +1,24 @@
 #!/bin/sh
 
-VERSION=0.0.3
+VERSION=0.0.4
 RELEASE_NUMBER=1
 
 echo "Build pkg with version ${VERSION}"
 
 rm *.deb
-rm -r modem-programmer_*
+rm -r sim7600prg*
 
-mkdir -p "modem-programmer_${VERSION}-${RELEASE_NUMBER}_all/usr/bin/"
-mkdir -p "modem-programmer_${VERSION}-${RELEASE_NUMBER}_all/DEBIAN"
+mkdir -p "sim7600prg_${VERSION}-${RELEASE_NUMBER}_all/usr/bin/"
+mkdir -p "sim7600prg_${VERSION}-${RELEASE_NUMBER}_all/DEBIAN"
 
-echo "Package: ModemProgrammer
+echo "Package: sim7600prg
 Version: ${VERSION}
 Maintainer: karen.barsegyan-2001@bk.ru
 Depends: libc6
 Architecture: all
-Description: SIM76 Flasher" \
-> "modem-programmer_${VERSION}-${RELEASE_NUMBER}_all/DEBIAN/control"
+Description: SIM7600 Flasher" \
+> "sim7600prg_${VERSION}-${RELEASE_NUMBER}_all/DEBIAN/control"
 
-pyinstaller --onefile -w ModemProgrammer.py
-cp "dist/ModemProgrammer" "modem-programmer_${VERSION}-${RELEASE_NUMBER}_all/usr/bin/ModemProgrammer"
-dpkg --build "modem-programmer_${VERSION}-${RELEASE_NUMBER}_all"
+pyinstaller --onefile -w StartFlasher.py
+cp "dist/StartFlasher" "sim7600prg_${VERSION}-${RELEASE_NUMBER}_all/usr/bin/sim7600prg"
+dpkg --build "sim7600prg_${VERSION}-${RELEASE_NUMBER}_all"

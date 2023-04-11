@@ -49,7 +49,7 @@ class Flasher:
             await self._websocket.send('LogErr', msg)
 
         elif level == 'OK':
-            log.error_no_lineo(msg, str(sys._getframe(1).f_lineno))
+            log.info_no_lineo(msg, str(sys._getframe(1).f_lineno))
             await self._websocket.send('LogOk', msg)
 
         else:

@@ -1,6 +1,7 @@
 .idea/
 __pycache__/
 FlashData/
+sim7600*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

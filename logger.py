@@ -19,15 +19,17 @@ class logger():
 
         self._logger.setLevel(level)
 
+        log_path = '/home/pi/sim76prg_log'
+
         try:
-            os.mkdir(f"log")
+            os.mkdir(f"{log_path}/")
         except: pass
 
         try:
-            os.remove(f"log/{name}.log")
+            os.remove(f"{log_path}/{name}.log")
         except: pass
         
-        log_hndl = logging.FileHandler(f"log/{name}.log")
+        log_hndl = logging.FileHandler(f"{log_path}/{name}.log")
 
         log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] %(message)s - %(asctime)s'))
 
