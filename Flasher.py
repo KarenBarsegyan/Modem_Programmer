@@ -4,6 +4,7 @@ from logger import logger
 import asyncio
 import RPi.GPIO as gpio
 
+VERSION = '0.0.4'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -82,42 +83,39 @@ class Flasher:
 
         return adb_res
 
-    async def _setAdbMode(self, port):
+    async def _setAdbMode(self):
         """Set modem ADB mode"""
         for i in range(30):
             try:
                 cp = ComPort()
-                cp.openPort(port)
+                cp.openPort(self._port)
                 cp.sendATCommand('at+cusbadb=1')
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.1)
                 if 'OK' in cp.getATResponse():
                     cp.sendATCommand('at+creset')
-                    await self._print_msg('INFO', f'ADB on {port} is taken on succesfully')
+                    await self._print_msg('INFO', f'ADB on {self._port} is taken on succesfully')
                     return True
             
             except Exception: pass
 
             await asyncio.sleep(1)
         
-        await self._print_msg('ERROR', f'ADB on {port} was not taken on')
+        await self._print_msg('ERROR', f'ADB on {self._port} was not taken on')
         return False
 
-    async def _wait_until_reboot(self, port):
+    async def _wait_until_reboot(self) -> bool:
         """Wait while com port is not available"""
         result = False
         for i in range(20):
             try:
                 cp = ComPort()
-                cp.openPort(port)
+                cp.openPort(self._port)
                 result = True
                 break
             except Exception:
                 await asyncio.sleep(1)
         
-        if result:
-            await self._print_msg('OK', f'Flashing ended OK\n\n')
-        else:
-            await self._print_msg('ERROR', f'Flashing ended with Error')
+        return result
 
     async def _setBootloaderMode(self):
         """Reboot device in bootloader (fastboot) mode"""
@@ -146,6 +144,52 @@ class Flasher:
 
         except Exception:
             await self._print_msg('ERROR', 'SetNormalMode Error')
+
+    async def _get_fw_version(self) -> bool:
+        for i in range(15):
+            try:
+                cp = ComPort()
+                cp.openPort(self._port)
+                cp.sendATCommand('at+GMR')
+                await asyncio.sleep(0.1)
+                fw = cp.getATResponse()
+                if fw != '':
+                    fw = fw[fw.find('+GMR:')+6:]
+                    fw = fw[:fw.find('\n')-1]
+                    await self._print_msg('INFO', f'FW version: {fw}')
+                    return True
+            
+            except Exception: pass
+
+            await asyncio.sleep(1)
+
+        await self._print_msg('ERROR', f'Get fw version Error')
+        return False
+    
+    async def _get_fun(self) -> bool:
+        for i in range(15):
+            try:
+                cp = ComPort()
+                cp.openPort(self._port)
+                cp.sendATCommand('at+CFUN?')
+                await asyncio.sleep(0.1)
+                fun = cp.getATResponse()
+                if fun != '':
+                    fun = fun[fun.find('+CFUN:')+7:]
+                    fun = fun[:fun.find('\n')-1]
+        
+                    if fun.find('1') >= 0:
+                        return True
+                    else:
+                        await self._print_msg('ERROR', f'Fun != 1')
+                        return False
+            
+            except Exception: pass
+
+            await asyncio.sleep(1)
+
+        await self._print_msg('ERROR', f'Get fun Error')
+        return False
 
     async def _fastbootFlashAboot(self):
         try:
@@ -257,12 +301,14 @@ class Flasher:
     async def flashModem(self, comport) -> bool:
         self._port = comport
 
+        await self._print_msg('INFO', f'Flasher Version: {VERSION}')
+
         # Take on Relay
         gpio.output(RELAY_PIN, gpio.LOW)
         await self._print_msg('INFO', f'Start flashing {self._port}')
 
         # Wait until SIM is Taken On and take on adb
-        if not await self._setAdbMode(self._port):
+        if not await self._setAdbMode():
             return False
 
         # Check until adb device is not foung or 30 sec what is less
@@ -286,11 +332,27 @@ class Flasher:
         await self._setNormalMode()
         
         # Check if reboot was OK or Not OK
-        await self._wait_until_reboot(self._port)
+        if await self._wait_until_reboot():
+            await self._print_msg('INFO', f'Reboot Ok')
+        else:
+            await self._print_msg('ERROR', f'Reboot Error')
+            return False
 
+        # Get firmware version
+        if not await self._get_fw_version(): 
+            return False
+
+        # Get status flag
+        if not await self._get_fun(): 
+            return False
+        
         # Take off relay
         gpio.output(RELAY_PIN, gpio.HIGH)
         
+        await self._print_msg('OK', f'Success!')
+        await self._print_msg('OK', f'')
+        await self._print_msg('OK', f'')
+
         return True
 
 

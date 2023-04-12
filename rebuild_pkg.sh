@@ -1,6 +1,6 @@
 #!/bin/sh
 
-VERSION=0.0.3
+VERSION=0.0.4
 RELEASE_NUMBER=1
 
 echo "Build pkg with version ${VERSION}"
