@@ -3,6 +3,7 @@ from Flasher import Flasher
 from Websocket import WebSocketServer, logger
 import signal
 import RPi.GPIO as gpio
+import gc
 
 log = logger('ModemProgrammer', logger.WARNING)
 
@@ -53,6 +54,7 @@ async def main():
         async with WebSocketServer(ip = '0.0.0.0', port = 8000) as ws_server, Flasher(ws_server) as flasher:
             await main_thread(ws_server, flasher)
             log.info("Ended async with loop")
+            gc.collect()
 
 # ctrl+c press handler
 def sigint_handler(signum, frame):
@@ -80,6 +82,10 @@ signal.signal(signal.SIGINT, sigint_handler)
 
 
 if __name__ == '__main__':
+    # Disable garbage collector to clean garbage only with 
+    # gc.collect() function
+    gc.disable()
+
     # Create asyncio loop. Here all tasks will be sheduled
     loop = asyncio.get_event_loop()
     try:
