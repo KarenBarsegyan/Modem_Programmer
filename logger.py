@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import RotatingFileHandler
 import sys, os
 
 
@@ -24,12 +25,9 @@ class logger():
         try:
             os.mkdir(f"{log_path}/")
         except: pass
-
-        try:
-            os.remove(f"{log_path}/{name}.log")
-        except: pass
         
-        log_hndl = logging.FileHandler(f"{log_path}/{name}.log")
+        log_hndl = RotatingFileHandler(f"{log_path}/{name}.log", maxBytes=100000, 
+                                               backupCount=1, encoding=None, delay=0)
 
         log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] %(message)s - %(asctime)s'))
 
