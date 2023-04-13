@@ -2,42 +2,18 @@
 
 SIM7600 programmer for using in Raspberry Pi. This script must be run at any RPI connected to [ScadaToRpiGateway](https://www.google.com) machine. Each RPI in local network must have uniq static IP. This gives an opportunity for ScadaToRpiGateway to communicate with each RPI independently. So, you can start flashing of SIM76 from any RPI in any time you want.
 
-Next you will see 3 sections:
-1. Setup Rasbian
-2. How to start ModemProgrammer from apt repository (`For users`)
-3. How to start ModemProgrammer from source (`For developers`)
+Next you will see 23 sections:
+1. How to set up sim7600 programmer from apt repository (`For users`) <br> 
+   You have to do this steps if you want to set up new rpi for flashing modems only 
 
-**You have to do section 1 and one of sections 2 or 3.** Choose **Section 2** if you want to start new RPI or **Section 3** if you want to edit ModemProgrammer code
+2. How to set up sim7600 programmer from source (`For developers`) <br>
+   You have to do this steps if you want to change sim7600prg source code, test it and make new .deb pkg for all other RPIs 
 
-# 1) What to do with clear Rasbian?
+3. How to make everything from scratch (`For developers`) <br>
+   You have to do this steps to understand all design decisions 
 
-### Put sd into PC and do next steps:
 
-1. Take on SSH by adding empty file named 'ssh' to boot
-
-    ``` bash
-    cd /media/sd/boot
-    touch ssh
-    ```
-
-2. Navigate to the SD card’s rootfs directory and edit /etc/dhcpcd.conf
-
-    ``` bash
-    cd /media/sd/rootfs/etc
-    nano dhcpcd.conf
-    ```
-3. Add static IP settings in the end of file. N depends on current RPI number. Use numbers from 2 to 254
-    
-    ``` bash
-    interface eth0
-    static ip_address=192.168.4.2/24
-    static routers=192.168.4.1
-    static domain_name_servers=192.168.4.1
-    ```
-
-4. Put SD into RPI, take power ON and plug ethernet
-
-# 2) What to do to start Modem Flasher **From APT Repository** and make it run in startup?
+# 1) How to set up **sim7600prg** from apt repository?
 
 ### Connect to RPI via ssh and do next steps:
 
@@ -85,7 +61,15 @@ Next you will see 3 sections:
 
 6. Now you can restart yor Pi!
 
-# 3) What to do to start Modem Flasher **From Source**?
+# 2) How to set up **sim7600prg** from source?
+    
+1. dssd
+
+    ``` bash
+    sudo bash -c 'bash /home/pi/startup/startup.sh  > /home/pi/startup/startup.log 2>&1' &
+    ```
+
+# 3) How to make everything from scratch?
 
 ### Connect to RPI via ssh and do next steps:
 
