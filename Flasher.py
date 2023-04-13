@@ -4,7 +4,7 @@ from logger import logger
 import asyncio
 import RPi.GPIO as gpio
 
-VERSION = '0.0.4'
+VERSION = '0.0.5'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -191,6 +191,12 @@ class Flasher:
         await self._print_msg('ERROR', f'Get fun Error')
         return False
 
+    async def _communicate(self, proc):
+            stdout, stderr = await proc.communicate()
+            msgs = stderr.decode().split('\n')
+            for msg in msgs[:len(msgs)-1]:
+                await self._print_msg('INFO', msg)
+
     async def _fastbootFlashAboot(self):
         try:
             proc = await asyncio.create_subprocess_shell(
@@ -198,9 +204,7 @@ class Flasher:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await proc.communicate()
-            for msg in stderr.decode().split('\n'):
-                await self._print_msg('INFO', msg)
+            await self._communicate(proc)
             
         except Exception:
             await self._print_msg('ERROR', 'FastbootFlashAboot Error')
@@ -212,9 +216,7 @@ class Flasher:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await proc.communicate()
-            for msg in stderr.decode().split('\n'):
-                await self._print_msg('INFO', msg)
+            await self._communicate(proc)
 
         except Exception:
             await self._print_msg('ERROR', 'FastbootFlashRpm Error')
@@ -226,9 +228,7 @@ class Flasher:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await proc.communicate()
-            for msg in stderr.decode().split('\n'):
-                await self._print_msg('INFO', msg)
+            await self._communicate(proc)
     
         except Exception:
             await self._print_msg('ERROR', 'FastbootFlashSbl Error')
@@ -240,9 +240,7 @@ class Flasher:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await proc.communicate()
-            for msg in stderr.decode().split('\n'):
-                await self._print_msg('INFO', msg)
+            await self._communicate(proc)
             
         except Exception:
             await self._print_msg('ERROR', 'FastbootFlashTz Error')
@@ -254,9 +252,7 @@ class Flasher:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await proc.communicate()
-            for msg in stderr.decode().split('\n'):
-                await self._print_msg('INFO', msg)
+            await self._communicate(proc)
 
         except Exception:
             await self._print_msg('ERROR', 'FastbootFlashModem Error')
@@ -268,9 +264,7 @@ class Flasher:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await proc.communicate()
-            for msg in stderr.decode().split('\n'):
-                await self._print_msg('INFO', msg)
+            await self._communicate(proc)
 
         except Exception:
             await self._print_msg('ERROR', 'FastbootFlashBoot Error')
@@ -282,9 +276,7 @@ class Flasher:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await proc.communicate()
-            for msg in stderr.decode().split('\n'):
-                await self._print_msg('INFO', msg)
+            await self._communicate(proc)
 
         except Exception:
             await self._print_msg('ERROR', 'FastbootFlashSystem Error')
@@ -307,6 +299,9 @@ class Flasher:
         gpio.output(RELAY_PIN, gpio.LOW)
         await self._print_msg('INFO', f'Start flashing {self._port}')
 
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
+
         # Wait until SIM is Taken On and take on adb
         if not await self._setAdbMode():
             return False
@@ -325,8 +320,14 @@ class Flasher:
         await self._setBootloaderMode()
         await asyncio.sleep(2)
 
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
+
         # Flash all of the data step by step
         await self._fastbootFlash()
+
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
 
         # Reboot in normal mode
         await self._setNormalMode()
@@ -338,9 +339,15 @@ class Flasher:
             await self._print_msg('ERROR', f'Reboot Error')
             return False
 
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
+
         # Get firmware version
         if not await self._get_fw_version(): 
             return False
+        
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
 
         # Get status flag
         if not await self._get_fun(): 
