@@ -4,11 +4,11 @@ from logger import logger
 import asyncio
 import RPi.GPIO as gpio
 
-VERSION = '0.0.5'
+VERSION = '0.0.6'
 
 log = logger(__name__, logger.INFO, indent=75)
 
-RELAY_PIN = 21
+RELAY_PIN = 14
 
 class Flasher:
     def __init__(self, websocket):
