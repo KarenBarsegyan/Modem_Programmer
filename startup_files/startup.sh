@@ -29,21 +29,23 @@ echo -e "\n--- Get System ---\n"
 file1="/home/pi/startup/SysRelease"
 file2="/home/pi/startup/NewSysRelease"
 
-curl http://${APT_SERVER_IP}/apt-repo/system/Release > NewSysRelease
-if cmp -s "$file1" "$file2"; then
-    echo -e "\n--- No updates ---\n"
-else
-    VERSION=$(cat NewSysRelease | grep "Version")
-    VERSION=${VERSION:9}
-    echo -e "\n--- New version ${VERSION} available ---\n"
+if curl http://${APT_SERVER_IP}/apt-repo/system/Release > NewSysRelease; 
+then
+    if cmp -s "$file1" "$file2"; then
+        echo -e "\n--- No updates ---\n"
+    else
+        VERSION=$(cat NewSysRelease | grep "Version")
+        VERSION=${VERSION:9}
+        echo -e "\n--- New version ${VERSION} available ---\n"
 
-    cat NewSysRelease > SysRelease
-    rm NewSysRelease
+        cat NewSysRelease > SysRelease
+        rm NewSysRelease
 
-    curl http://${APT_SERVER_IP}/apt-repo/system/sim7600system_${VERSION}.tar.gz > flashdata.tar.gz
-    mkdir -p /home/pi/FlashData
-    rm /home/pi/FlashData/*
-    tar xzfv flashdata.tar.gz -C /home/pi/FlashData/
+        curl http://${APT_SERVER_IP}/apt-repo/system/sim7600system_${VERSION}.tar.gz > flashdata.tar.gz
+        mkdir -p /home/pi/FlashData
+        rm /home/pi/FlashData/*
+        tar xzfv flashdata.tar.gz -C /home/pi/FlashData/
+    fi
 fi
 
 adb start-server
