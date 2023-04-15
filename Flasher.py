@@ -5,7 +5,7 @@ import asyncio
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.0.8'
+VERSION = '0.0.9'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -187,7 +187,7 @@ class Flasher:
     async def _get_fw_version(self) -> bool:
         cp = ComPort()
         if await self._waitForPort(cp, 20):
-            for i in range(10):
+            for i in range(20):
                 try:
                     cp.sendATCommand('at+GMR')
                     await asyncio.sleep(0.1)
@@ -209,7 +209,7 @@ class Flasher:
     async def _get_fun(self) -> bool:
         cp = ComPort()
         if await self._waitForPort(cp, 10):
-            for i in range(10):
+            for i in range(20):
                 try:
                     cp.sendATCommand('at+CFUN?')
                     await asyncio.sleep(0.1)
@@ -381,7 +381,7 @@ class Flasher:
 
         # Sometimes ADB takes on not from first try
         adb_result = False
-        for i in range(3):
+        for i in range(2):
             # Wait until SIM is Taken On and take on adb
             if not await self._setAdbMode():
                 break

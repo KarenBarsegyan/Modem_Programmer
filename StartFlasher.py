@@ -5,7 +5,7 @@ import signal
 import RPi.GPIO as gpio
 import gc
 
-log = logger('ModemProgrammer', logger.WARNING)
+log = logger('sim7600prg', logger.INFO)
 
 async def main_thread(ws_server, flasher):
     log.info("Main Thread")
@@ -18,6 +18,10 @@ async def main_thread(ws_server, flasher):
             cmd, msg = await ws_server.receive()
 
             log.info("Main after receive")
+
+            if cmd == 'Are you ready':
+               log.info("Asked if i'm ready")
+               await ws_server.send('Ready', 'Ok') 
 
             # Start flashing!
             if cmd == 'Start Flashing':
