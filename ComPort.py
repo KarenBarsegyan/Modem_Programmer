@@ -8,6 +8,9 @@ class ComPort:
         self._com_name_win = ''
         self._com_name_linux = ''
 
+    # def __del__(self):
+    #     self._com.close()
+
     def getPortsList(self) -> list:
         result = []
         for port in serial.tools.list_ports.comports():

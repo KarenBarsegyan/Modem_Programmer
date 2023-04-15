@@ -3,8 +3,9 @@ from ComPort import ComPort
 from logger import logger
 import asyncio
 import RPi.GPIO as gpio
+import time
 
-VERSION = '0.0.6'
+VERSION = '0.0.7'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -56,6 +57,51 @@ class Flasher:
         else:
             raise Exception('Wrong log level')
 
+    
+    async def _test(self):
+        """Get list of ADB devices"""
+        # for i in range(30):
+        
+        print('aaa')
+        proc = await asyncio.create_subprocess_shell(
+            'bash ~/Work/Modem_Programmer/while.sh ',
+            shell=True,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        print('bbb')
+
+        await asyncio.sleep(3)
+        await proc.terminate()
+        stdout, stderr = await proc.communicate()
+        print('ccc')
+        print(stdout.decode().split('\n'))
+        print('ddd')
+        
+
+    async def _waitForPort(self, cp, secs) -> bool:
+        found = False
+        for i in range(secs):
+            for port in cp.getPortsList():
+                if self._port.find(port) >= 0:
+                    found = True
+                    break
+            
+            if found:
+                try:
+                    cp.openPort(self._port)
+                    await self._print_msg('INFO', f'Waited for com port: {i} sec')
+                    break
+                except:
+                    found = False
+
+            await asyncio.sleep(1)
+        
+        if not found:
+            await self._print_msg('ERROR', f'Waited for com port ERROR')
+
+        return found
+    
     async def _getAdbDevices(self):
         """Get list of ADB devices"""
         for i in range(30):
@@ -77,45 +123,32 @@ class Flasher:
                 adb_res = adb_res[0].split('\n')
 
             if adb_res[1] != '':
+                await self._print_msg('INFO', f'Waited for ADB Devices {i} sec')
                 return adb_res
             
             await asyncio.sleep(1)
-
+        
         return adb_res
 
     async def _setAdbMode(self):
         """Set modem ADB mode"""
-        for i in range(30):
-            try:
-                cp = ComPort()
-                cp.openPort(self._port)
-                cp.sendATCommand('at+cusbadb=1')
-                await asyncio.sleep(0.1)
-                if 'OK' in cp.getATResponse():
-                    cp.sendATCommand('at+creset')
-                    await self._print_msg('INFO', f'ADB on {self._port} is taken on succesfully')
-                    return True
-            
-            except Exception: pass
+        cp = ComPort()
+        if await self._waitForPort(cp, 20):
+            for i in range(30):
+                try:
+                    cp.sendATCommand('at+cusbadb=1')
+                    await asyncio.sleep(0.1)
+                    if 'OK' in cp.getATResponse():
+                        cp.sendATCommand('at+creset')
+                        await self._print_msg('INFO', f'ADB mode is taken on succesfully in {i} sec')
+                        return True
+                
+                except Exception: pass
 
-            await asyncio.sleep(1)
+                await asyncio.sleep(1)
         
         await self._print_msg('ERROR', f'ADB on {self._port} was not taken on')
         return False
-
-    async def _wait_until_reboot(self) -> bool:
-        """Wait while com port is not available"""
-        result = False
-        for i in range(20):
-            try:
-                cp = ComPort()
-                cp.openPort(self._port)
-                result = True
-                break
-            except Exception:
-                await asyncio.sleep(1)
-        
-        return result
 
     async def _setBootloaderMode(self):
         """Reboot device in bootloader (fastboot) mode"""
@@ -146,47 +179,49 @@ class Flasher:
             await self._print_msg('ERROR', 'SetNormalMode Error')
 
     async def _get_fw_version(self) -> bool:
-        for i in range(15):
-            try:
-                cp = ComPort()
-                cp.openPort(self._port)
-                cp.sendATCommand('at+GMR')
-                await asyncio.sleep(0.1)
-                fw = cp.getATResponse()
-                if fw != '':
-                    fw = fw[fw.find('+GMR:')+6:]
-                    fw = fw[:fw.find('\n')-1]
-                    await self._print_msg('INFO', f'FW version: {fw}')
-                    return True
-            
-            except Exception: pass
+        cp = ComPort()
+        if await self._waitForPort(cp, 30):
+            for i in range(15):
+                try:
+                    cp.sendATCommand('at+GMR')
+                    await asyncio.sleep(0.1)
+                    fw = cp.getATResponse()
+                    if fw != '':
+                        fw = fw[fw.find('+GMR:')+6:]
+                        fw = fw[:fw.find('\n')-1]
+                        await self._print_msg('INFO', f'Waited for FW version {i} sec')
+                        await self._print_msg('INFO', f'FW version: {fw}')
+                        return True
+                
+                except Exception: pass
 
-            await asyncio.sleep(1)
+                await asyncio.sleep(1)
 
         await self._print_msg('ERROR', f'Get fw version Error')
         return False
     
     async def _get_fun(self) -> bool:
-        for i in range(15):
-            try:
-                cp = ComPort()
-                cp.openPort(self._port)
-                cp.sendATCommand('at+CFUN?')
-                await asyncio.sleep(0.1)
-                fun = cp.getATResponse()
-                if fun != '':
-                    fun = fun[fun.find('+CFUN:')+7:]
-                    fun = fun[:fun.find('\n')-1]
-        
-                    if fun.find('1') >= 0:
-                        return True
-                    else:
-                        await self._print_msg('ERROR', f'Fun != 1')
-                        return False
+        cp = ComPort()
+        if await self._waitForPort(cp, 20):
+            for i in range(15):
+                try:
+                    cp.sendATCommand('at+CFUN?')
+                    await asyncio.sleep(0.1)
+                    fun = cp.getATResponse()
+                    if fun != '':
+                        fun = fun[fun.find('+CFUN:')+7:]
+                        fun = fun[:fun.find('\n')-1]
             
-            except Exception: pass
+                        if fun.find('1') >= 0:
+                            await self._print_msg('INFO', f'Waited for FUN {i} sec')
+                            return True
+                        else:
+                            await self._print_msg('ERROR', f'Fun != 1')
+                            return False
+                
+                except Exception: pass
 
-            await asyncio.sleep(1)
+                await asyncio.sleep(1)
 
         await self._print_msg('ERROR', f'Get fun Error')
         return False
@@ -291,7 +326,14 @@ class Flasher:
         await self._fastbootFlashSystem()
 
     async def flashModem(self, comport) -> bool:
+        start_time = time.time()
+
+
         self._port = comport
+
+        # print('lol')
+        # await self._test()
+        # print('kek')
 
         await self._print_msg('INFO', f'Flasher Version: {VERSION}')
 
@@ -302,19 +344,27 @@ class Flasher:
         # Just \n in logs
         await self._print_msg('INFO', f'')
 
-        # Wait until SIM is Taken On and take on adb
-        if not await self._setAdbMode():
-            return False
+        # Sometimes ADB takes on not from first try
+        adb_result = False
+        for i in range(3):
+            # Wait until SIM is Taken On and take on adb
+            if not await self._setAdbMode():
+                return False
 
-        # Check until adb device is not foung or 30 sec what is less
-        adb_devices = await self._getAdbDevices()
+            # Check until adb device is not foung or 30 sec what is less
+            adb_devices = await self._getAdbDevices()
 
-        # if adb device was found go next, otherwise return
-        if adb_devices[1] == '':
-            await self._print_msg('ERROR', 'No ADB device found')
+            # if adb device was found go next, otherwise return
+            if adb_devices[1] == '':
+                await self._print_msg('WARNING', f'No ADB device found. Try {i}')
+            else:
+                adb_result = True
+                await self._print_msg('INFO', 'ADB device found!')
+                break
+
+        if not adb_result:
+            await self._print_msg(f'Error', 'No ADB device found')
             return False
-        else:
-            await self._print_msg('INFO', 'ADB device found!')
 
         # Take on bootloader mode to get ready for flashing
         await self._setBootloaderMode()
@@ -331,16 +381,6 @@ class Flasher:
 
         # Reboot in normal mode
         await self._setNormalMode()
-        
-        # Check if reboot was OK or Not OK
-        if await self._wait_until_reboot():
-            await self._print_msg('INFO', f'Reboot Ok')
-        else:
-            await self._print_msg('ERROR', f'Reboot Error')
-            return False
-
-        # Just \n in logs
-        await self._print_msg('INFO', f'')
 
         # Get firmware version
         if not await self._get_fw_version(): 
@@ -353,16 +393,27 @@ class Flasher:
         if not await self._get_fun(): 
             return False
         
+        await asyncio.sleep(1)
+        
         # Take off relay
         gpio.output(RELAY_PIN, gpio.HIGH)
         
         await self._print_msg('OK', f'Success!')
-        await self._print_msg('OK', f'')
-        await self._print_msg('OK', f'')
+
+        end_time = time.time()
+        await self._print_msg('INFO', f'Time: {(end_time-start_time):.03f} sec')
+        await self._print_msg('INFO', f'')
 
         return True
 
 
+
+# Tests
+from Websocket import WebSocketServer
+async def test():
+    async with WebSocketServer(ip = '0.0.0.0', port = 8000) as ws_server, Flasher(ws_server) as flasher:
+        await flasher.flashModem('/dev/ttyUSB2')
+
 if __name__ == '__main__':
-    flasher = Flasher()
-    asyncio.run(flasher.flashModem('/dev/ttyUSB2'))
+    asyncio.run(test())
+    
