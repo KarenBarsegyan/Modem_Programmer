@@ -5,7 +5,7 @@ import asyncio
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.1.2'
+VERSION = '0.1.3'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -142,7 +142,7 @@ class Flasher:
             # It can retorn OK answer, but adb wold still be off
             # So wait a bit
             if firstTry:
-                await asyncio.sleep(15)
+                await asyncio.sleep(20)
 
             for i in range(10):
                 try:
@@ -192,6 +192,7 @@ class Flasher:
     async def _get_fw_version(self) -> bool:
         cp = ComPort()
         if await self._waitForPort(cp, 20):
+            await asyncio.sleep(3)
             for i in range(20):
                 try:
                     cp.flushPort()
@@ -216,6 +217,7 @@ class Flasher:
     async def _get_fun(self) -> bool:
         cp = ComPort()
         if await self._waitForPort(cp, 10):
+            await asyncio.sleep(3)
             for i in range(20):
                 try:
                     cp.flushPort()
