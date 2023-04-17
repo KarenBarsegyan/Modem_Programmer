@@ -5,7 +5,7 @@ import asyncio
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.1.1'
+VERSION = '0.1.2'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -146,6 +146,7 @@ class Flasher:
 
             for i in range(10):
                 try:
+                    cp.flushPort()
                     cp.sendATCommand('at+cusbadb=1')
                     await asyncio.sleep(0.1)
                     if 'OK' in cp.getATResponse():
@@ -193,6 +194,7 @@ class Flasher:
         if await self._waitForPort(cp, 20):
             for i in range(20):
                 try:
+                    cp.flushPort()
                     cp.sendATCommand('at+GMR')
                     await asyncio.sleep(0.1)
                     fw = cp.getATResponse()
@@ -216,6 +218,7 @@ class Flasher:
         if await self._waitForPort(cp, 10):
             for i in range(20):
                 try:
+                    cp.flushPort()
                     cp.sendATCommand('at+CFUN?')
                     await asyncio.sleep(0.1)
                     fun = cp.getATResponse()

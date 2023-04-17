@@ -2,6 +2,7 @@
 __pycache__/
 FlashData/
 sim7600*/
+tests/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

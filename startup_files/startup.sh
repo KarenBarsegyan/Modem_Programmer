@@ -19,10 +19,28 @@ done
 
 echo "deb [arch=all signed-by=/home/pi/startup/pgp-key.public] http://${APT_SERVER_IP}/apt-repo stable main" | sudo tee /etc/apt/sources.list.d/sim7600prg.list
 
+sudo systemctl restart systemd-timesyncd.service
+
+a=0
+while [[ "$(sudo timedatectl | grep synchronized)" != \
+         "System clock synchronized: yes" ]]; do
+
+    echo Trying to sync data $a time
+    a=`expr $a + 1`
+    sleep 1
+    
+    if [ $a -gt 10 ]
+    then
+    break
+    fi
+
+done
+
+echo -e "\n--- Time Synced--- \n"
+
 sudo apt clean
 sudo apt update
 sudo apt upgrade sim7600prg -y
-
 
 echo -e "\n--- Get System ---\n"
 
