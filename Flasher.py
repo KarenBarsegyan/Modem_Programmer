@@ -5,7 +5,7 @@ import asyncio
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.1.3'
+VERSION = '0.1.4'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -59,7 +59,7 @@ class Flasher:
         else:
             raise Exception('Wrong log level')
 
-    
+
     async def _test(self):
         """Get list of ADB devices"""
         # for i in range(30):
@@ -82,6 +82,7 @@ class Flasher:
         
 
     async def _waitForPort(self, cp, secs) -> bool:
+        """Try get usb device until some found & open port"""
         found = False
         for i in range(secs):
             for port in cp.getPortsList():
@@ -92,7 +93,6 @@ class Flasher:
             if found:
                 try:
                     cp.openPort(self._port)
-                    cp.flushPort()
                     await self._print_msg('INFO', f'Waited for com port: {i} sec')
                     break
                 except:
@@ -104,6 +104,47 @@ class Flasher:
             await self._print_msg('ERROR', f'Waited for com port ERROR')
 
         return found
+
+    async def _AT_send_recv(self, cp, cmd, secs):
+        """Send and receive AT command"""
+        cp.flushPort()
+        cp.sendATCommand(cmd)
+
+        resp = ''
+        ansGot = False
+        for i in range(secs):
+            resp_raw = cp.getATResponse()
+            
+            if resp_raw != '':
+                await asyncio.sleep(0.5)
+                new_resp = cp.getATResponse()
+                while new_resp != '':
+                    await asyncio.sleep(0.5)
+                    resp_raw += new_resp
+                    new_resp_split = new_resp.split('\r\n')
+                    await self._print_msg('INFO', f'Added resp: {new_resp_split}')
+                    new_resp = cp.getATResponse()
+
+                resp = []
+                for chr in resp_raw.split('\r\n'):
+                    if chr != '':
+                        resp.append(chr)
+                    
+                if '+CME ERROR: SIM not inserted' in resp:
+                    await self._print_msg('WARNING', f'SIM not found in {i} sec')
+                    return []
+
+                ansGot = True
+                await self._print_msg('INFO', f'At response got in {i} sec')
+                await self._print_msg('INFO', f'AT response: {resp}')
+                break
+
+            await asyncio.sleep(1)
+
+        if not ansGot:
+            await self._print_msg('WARNING', f'AT ans not gotten')
+
+        return resp
     
     async def _getAdbDevices(self):
         """Get list of ADB devices"""
@@ -133,26 +174,19 @@ class Flasher:
         
         return adb_res
 
-    async def _setAdbMode(self, firstTry: bool):
+    async def _setAdbMode(self):
         """Set modem ADB mode"""
         cp = ComPort()
         if await self._waitForPort(cp, 15):
-            await self._print_msg('INFO', f'Wait a bit')
-            # When you start SIM7600 and momentally send AT cmd
-            # It can retorn OK answer, but adb wold still be off
-            # So wait a bit
-            if firstTry:
-                await asyncio.sleep(20)
-
+            await asyncio.sleep(15)
             for i in range(10):
                 try:
-                    cp.flushPort()
-                    cp.sendATCommand('at+cusbadb=1')
-                    await asyncio.sleep(0.1)
-                    if 'OK' in cp.getATResponse():
-                        cp.sendATCommand('at+creset')
-                        await self._print_msg('INFO', f'ADB mode is taken on succesfully in {i} sec')
-                        return True
+                    resp = await self._AT_send_recv(cp, 'at+cusbadb=1', 20)
+                    if resp == ['OK'] or resp == ['at+cusbadb=1\r', 'OK']:
+                        resp = await self._AT_send_recv(cp, 'at+creset', 20)
+                        if resp == ['OK']:
+                            await self._print_msg('INFO', f'ADB mode is taken on succesfully in {i} sec')
+                            return True
                 
                 except Exception: pass
 
@@ -192,19 +226,13 @@ class Flasher:
     async def _get_fw_version(self) -> bool:
         cp = ComPort()
         if await self._waitForPort(cp, 20):
-            await asyncio.sleep(3)
+            await asyncio.sleep(15)
             for i in range(20):
                 try:
-                    cp.flushPort()
-                    cp.sendATCommand('at+GMR')
-                    await asyncio.sleep(0.1)
-                    fw = cp.getATResponse()
-                    await self._print_msg('WARNING', f'FW: {fw}')
-                    if fw != '':
-                        fw = fw[fw.find('+GMR:')+6:]
-                        fw = fw[:fw.find('\n')-1]
+                    fw = await self._AT_send_recv(cp, 'at+GMR', 20)
+                    if '+GMR:' in fw[0] and fw[1] == 'OK' and len(fw) == 2:
                         await self._print_msg('INFO', f'Waited for FW version {i} sec')
-                        await self._print_msg('INFO', f'FW version: {fw}')
+                        await self._print_msg('INFO', f'FW version: {fw[0][6:]}')
                         return True
                 
                 except Exception: pass
@@ -217,24 +245,15 @@ class Flasher:
     async def _get_fun(self) -> bool:
         cp = ComPort()
         if await self._waitForPort(cp, 10):
-            await asyncio.sleep(3)
             for i in range(20):
                 try:
-                    cp.flushPort()
-                    cp.sendATCommand('at+CFUN?')
-                    await asyncio.sleep(0.1)
-                    fun = cp.getATResponse()
-                    await self._print_msg('WARNING', f'Fun: {fun}')
-                    if fun != '':
-                        fun = fun[fun.find('+CFUN:')+7:]
-                        fun = fun[:fun.find('\n')-1]
-            
-                        if fun.find('1') >= 0:
-                            await self._print_msg('INFO', f'Waited for FUN {i} sec')
-                            return True
-                        else:
-                            await self._print_msg('ERROR', f'Fun != 1')
-                            return False
+                    fun = await self._AT_send_recv(cp, 'at+CFUN?', 20)           
+                    if fun == ['+CFUN: 1', 'OK'] :
+                        await self._print_msg('INFO', f'Waited for FUN {i} sec')
+                        return True
+                    elif fun[1] == 'OK' and len(fun) == 2 :
+                        await self._print_msg('ERROR', f'Fun != 1')
+                        return False
                 
                 except Exception: pass
 
@@ -348,26 +367,39 @@ class Flasher:
             return False
 
     async def _fastbootFlash(self) -> bool:
+        await self._print_msg(f'INFO', 'FastbootFlashAboot')
         if not await self._fastbootFlashAboot():
-            await self._print_msg(f'Error', 'FastbootFlashAboot Error')
+            await self._print_msg(f'ERROR', 'FastbootFlashAboot Error')
             return False
+        await self._print_msg(f'INFO', '------------------')
+        await self._print_msg(f'INFO', 'FastbootFlashSbl')
         if not await self._fastbootFlashSbl():
-            await self._print_msg(f'Error', 'FastbootFlashSbl Error')
+            await self._print_msg(f'ERROR', 'FastbootFlashSbl Error')
             return False
+        await self._print_msg(f'INFO', '------------------')
+        await self._print_msg(f'INFO', 'FastbootFlashTz')
         if not await self._fastbootFlashTz():
-            await self._print_msg(f'Error', 'FastbootFlashTz Error')
+            await self._print_msg(f'ERROR', 'FastbootFlashTz Error')
             return False
+        await self._print_msg(f'INFO', '------------------')
+        await self._print_msg(f'INFO', 'FastbootFlashRpm')
         if not await self._fastbootFlashRpm():
-            await self._print_msg(f'Error', 'FastbootFlashRpm Error')
+            await self._print_msg(f'ERROR', 'FastbootFlashRpm Error')
             return False
+        await self._print_msg(f'INFO', '------------------')
+        await self._print_msg(f'INFO', 'FastbootFlashModem')
         if not await self._fastbootFlashModem():
-            await self._print_msg(f'Error', 'FastbootFlashModem Error')
+            await self._print_msg(f'ERROR', 'FastbootFlashModem Error')
             return False
+        await self._print_msg(f'INFO', '------------------')
+        await self._print_msg(f'INFO', 'FastbootFlashBoot')
         if not await self._fastbootFlashBoot():
-            await self._print_msg(f'Error', 'FastbootFlashBoot Error')
+            await self._print_msg(f'ERROR', 'FastbootFlashBoot Error')
             return False
+        await self._print_msg(f'INFO', '------------------')
+        await self._print_msg(f'INFO', 'FastbootFlashSystem')
         if not await self._fastbootFlashSystem():
-            await self._print_msg(f'Error', 'FastbootFlashSystem Error')
+            await self._print_msg(f'ERROR', 'FastbootFlashSystem Error')
             return False
         return True
 
@@ -389,31 +421,25 @@ class Flasher:
         # Just \n in logs
         await self._print_msg('INFO', f'')
 
-        # Sometimes ADB takes on not from first try
-        adb_result = False
-        firstTry = True
-        for i in range(2):
-            # Wait until SIM is Taken On and take on adb
-            if not await self._setAdbMode(firstTry):
-                break
-
-            # We don't need to wait a bit (incide _setAdbMode()) twice
-            firstTry = False
-
-            # Check until adb device is not founв or timeout what is less
-            adb_devices = await self._getAdbDevices()
-
-            # if adb device was found go next, otherwise return
-            if adb_devices[1] == '':
-                await self._print_msg('WARNING', f'No ADB device found. Try {i}')
-            else:
-                adb_result = True
-                await self._print_msg('INFO', 'ADB device found!')
-                break
-
-        if not adb_result:
-            await self._print_msg(f'Error', 'No ADB device found')
+        # Try set ADB mode
+        if not await self._setAdbMode():
             return False
+
+        # Check until adb device is not founв or timeout what is less
+        adb_devices = await self._getAdbDevices()
+
+        # if adb device was found go next, otherwise return
+        if adb_devices[1] == '':
+            await self._print_msg('ERROR', f'No ADB device found')
+            return False
+        else:
+            await self._print_msg('INFO', 'ADB device found!')
+        
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
+
+        # Show time from begin of flashing
+        await self._print_msg('INFO', f'Time: {(time.time()-start_time):.03f} sec')
 
         # Take on bootloader mode to get ready for flashing
         await self._setBootloaderMode()
@@ -425,6 +451,12 @@ class Flasher:
         # Flash all of the data step by step
         if not await self._fastbootFlash():
             return False
+
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
+
+        # Show time from begin of flashing
+        await self._print_msg('INFO', f'Time: {(time.time()-start_time):.03f} sec')
 
         # Just \n in logs
         await self._print_msg('INFO', f'')
@@ -448,10 +480,11 @@ class Flasher:
         # Take off relay
         gpio.output(RELAY_PIN, gpio.HIGH)
         
+        await self._print_msg('INFO', f'')
         await self._print_msg('OK', f'Success!')
 
-        end_time = time.time()
-        await self._print_msg('INFO', f'Time: {(end_time-start_time):.03f} sec')
+        # Show time from begin of flashing
+        await self._print_msg('INFO', f'Full Time: {(time.time()-start_time):.03f} sec')
         await self._print_msg('INFO', f'')
 
         return True
