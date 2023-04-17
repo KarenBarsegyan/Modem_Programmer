@@ -5,7 +5,7 @@ import asyncio
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.1.4'
+VERSION = '0.1.5'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -127,7 +127,7 @@ class Flasher:
 
                 resp = []
                 for chr in resp_raw.split('\r\n'):
-                    if chr != '':
+                    if chr != '' and chr != '\r' and chr != '\n':
                         resp.append(chr)
                     
                 if '+CME ERROR: SIM not inserted' in resp:
