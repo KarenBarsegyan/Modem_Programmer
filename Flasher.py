@@ -5,7 +5,7 @@ import asyncio
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.1.0'
+VERSION = '0.1.1'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -196,6 +196,7 @@ class Flasher:
                     cp.sendATCommand('at+GMR')
                     await asyncio.sleep(0.1)
                     fw = cp.getATResponse()
+                    await self._print_msg('WARNING', f'FW: {fw}')
                     if fw != '':
                         fw = fw[fw.find('+GMR:')+6:]
                         fw = fw[:fw.find('\n')-1]
@@ -218,6 +219,7 @@ class Flasher:
                     cp.sendATCommand('at+CFUN?')
                     await asyncio.sleep(0.1)
                     fun = cp.getATResponse()
+                    await self._print_msg('WARNING', f'Fun: {fun}')
                     if fun != '':
                         fun = fun[fun.find('+CFUN:')+7:]
                         fun = fun[:fun.find('\n')-1]
@@ -388,8 +390,10 @@ class Flasher:
         for i in range(2):
             # Wait until SIM is Taken On and take on adb
             if not await self._setAdbMode(firstTry):
-                firstTry = False
-                continue
+                break
+
+            # We don't need to wait a bit (incide _setAdbMode()) twice
+            firstTry = False
 
             # Check until adb device is not founв or timeout what is less
             adb_devices = await self._getAdbDevices()
