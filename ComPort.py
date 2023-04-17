@@ -38,14 +38,21 @@ class ComPort:
         else:
             print(comport + ' already opened')
 
-    def closePort(self, comport: str):
+    def flushPort(self):
+        if self._com.isOpen():
+            try:
+                self._com.flush()
+            except serial.SerialException:
+                print('Couldn\'t flush COM')
+
+    def closePort(self):
         if self._com.isOpen():
             try:
                 self._com.close()
             except serial.SerialException:
                 print('Couldn\'t close COM port')
         else:
-            print(comport + ' already closed')
+            print('Port already closed')
 
     def sendATCommand(self, cmd=''):
         cmd = cmd + '\x0D'  # символ возврата каретки - нужен для воспринятия AT команды модемом
