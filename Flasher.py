@@ -5,7 +5,7 @@ import asyncio
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.1.8'
+VERSION = '0.1.9'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -110,11 +110,7 @@ class Flasher:
 
     async def _AT_send_recv(self, cp, cmd, secs):
         """Send and receive AT command"""
-        try:
-            cp.flushPort()
-        except:
-            await self._print_msg('WARNING', f'Flush Error')
-
+        cp.flushPort()
         await self._print_msg('INFO', f'Send AT: {cmd}')
         cp.sendATCommand(cmd)
 
@@ -225,7 +221,10 @@ class Flasher:
                             await self._print_msg('OK', f'Creset ok in {i} sec')
                             return True
                 
-                except Exception: pass
+                except Exception:
+                    await self._print_msg('WARNING', 'Port error. Reopen')
+                    cp.closePort()
+                    await self._waitForPort(cp, 3)
 
                 await asyncio.sleep(1)
         
@@ -274,7 +273,10 @@ class Flasher:
                         await self._print_msg('INFO', f'FW version: {fw[0][6:]}')
                         return True
                 
-                except Exception: pass
+                except Exception:
+                    await self._print_msg('WARNING', 'Port error. Reopen')
+                    cp.closePort()
+                    await self._waitForPort(cp, 3)
 
                 await asyncio.sleep(1)
 
@@ -297,7 +299,10 @@ class Flasher:
                         await self._print_msg('ERROR', f'Fun != 1')
                         return False
                 
-                except Exception: pass
+                except Exception:
+                    await self._print_msg('WARNING', 'Port error. Reopen')
+                    cp.closePort()
+                    await self._waitForPort(cp, 3)
 
                 await asyncio.sleep(1)
 
