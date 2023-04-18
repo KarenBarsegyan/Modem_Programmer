@@ -5,8 +5,10 @@ import asyncio
 from async_timeout import timeout
 import RPi.GPIO as gpio
 import time
+import os
+import fcntl
 
-VERSION = '0.2.2'
+VERSION = '0.2.3'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -148,7 +150,9 @@ class Flasher:
     async def _getAdbDevices(self):
         """Get list of ADB devices"""
         adb_res = []
+        time = 0
         for i in range(25):
+            time = i
             res = await self._create_shell(r'\adb devices', 5)
             adb_res = res[0].decode().split('\r\n')   
             if sys.platform.startswith('linux'):
@@ -160,12 +164,56 @@ class Flasher:
             await asyncio.sleep(1)
 
         if adb_res[1] == '':
-            await self._print_msg('ERROR', f'No ADB device found')
+            await self._print_msg('ERROR', f'No ADB device found in {time} sec')
         else:
-            await self._print_msg('OK', 'ADB device found!')
+            await self._print_msg('OK', f'ADB device found in {time} sec')
             return True
         
         return False
+
+    async def _reset_usb(self):
+        USB_DEV_NAME = 'Qualcomm / Option SimTech'
+        # Same as _IO('U', 20) constant in the linux kernel.
+        CONST_USB_DEV_FS_RESET_CODE = ord('U') << (4*2) | 20
+        usb_dev_path = ""
+
+        # Based on 'lsusb' command, get the usb device path in the following format - 
+        # /dev/bus/usb//
+        proc = await asyncio.create_subprocess_shell(
+            'lsusb', 
+            shell=True,
+            stdout=asyncio.subprocess.PIPE
+        )
+        cmd_output, a = await proc.communicate()
+        usb_device_list = cmd_output.decode().split('\n')
+        for device in usb_device_list:
+            if USB_DEV_NAME in device:
+                await self._print_msg('INFO', f'Device found')
+                usb_dev_details = device.split()
+                usb_bus = usb_dev_details[1]
+                usb_dev = usb_dev_details[3][:3]
+                usb_dev_path = '/dev/bus/usb/%s/%s' % (usb_bus, usb_dev)
+
+        try:
+            if usb_dev_path != "":
+                await self._print_msg('INFO', f'Trying to reset USB Device')
+                device_file = os.open(usb_dev_path, os.O_WRONLY)
+                fcntl.ioctl(device_file, CONST_USB_DEV_FS_RESET_CODE, 0)
+                await self._print_msg('OK', f'USB Device reset successful')
+            else:
+                await self._print_msg('INFO', f'Nothing to reset')
+        except:
+            await self._print_msg('WARNING','Failed to reset the USB Device')
+        finally:
+            try:
+                os.close(device_file)
+            except:
+                pass
+
+    async def _reopen_usb(self, cp):
+        await self._print_msg('WARNING', 'Port error. Resetting')
+        await self._reset_usb()
+        await self._waitForPort(cp, 10)
 
     async def _setUpModem(self):
         """Set some modem parameters"""
@@ -173,6 +221,7 @@ class Flasher:
         if await self._waitForPort(cp, 15):
             # Wait untill modem starts
             await asyncio.sleep(20)
+           
             for i in range(10):
                 try:
                     resp = await self._AT_send_recv(cp, 'AT', 20)
@@ -191,11 +240,7 @@ class Flasher:
                         await self._print_msg('INFO', f'CPCMREG msg in {i} sec')
 
                 except Exception:
-                    await self._print_msg('WARNING', 'Port error. Reopen')
-                    try:
-                        cp.closePort()
-                    except: pass
-                    await self._waitForPort(cp, 10)
+                    await self._reopen_usb(cp)
 
                 await asyncio.sleep(1)
 
@@ -263,11 +308,7 @@ class Flasher:
                         return True
                 
                 except Exception:
-                    await self._print_msg('WARNING', 'Port error. Reopen')
-                    try:
-                        cp.closePort()
-                    except: pass
-                    await self._waitForPort(cp, 10)
+                    await self._reopen_usb(cp)
 
                 await asyncio.sleep(1)
 
@@ -289,11 +330,7 @@ class Flasher:
                         return False
                 
                 except Exception:
-                    await self._print_msg('WARNING', 'Port error. Reopen')
-                    try:
-                        cp.closePort()
-                    except: pass
-                    await self._waitForPort(cp, 10)
+                    await self._reopen_usb(cp)
 
                 await asyncio.sleep(1)
 
