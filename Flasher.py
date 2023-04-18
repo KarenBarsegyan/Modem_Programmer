@@ -6,7 +6,7 @@ from async_timeout import timeout
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.2.1'
+VERSION = '0.2.2'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -134,14 +134,6 @@ class Flasher:
                 await self._print_msg('INFO', f'At response got in {time} sec')
                 await self._print_msg('INFO', f'AT response: {resp}')   
 
-                # AT terminal starts before modem, so it will
-                # send this msg. Before calling this function you have to
-                # wait about 10-30 sec after reboot while modem is starting.
-                # But if it's not enough just try to call this function one more time  
-                if '+CME ERROR: SIM not inserted' in resp:
-                    await self._print_msg('WARNING', f'SIM not found in {time} sec')
-                    return []
-
                 ansGot = True
                 break
 
@@ -155,6 +147,7 @@ class Flasher:
     
     async def _getAdbDevices(self):
         """Get list of ADB devices"""
+        adb_res = []
         for i in range(25):
             res = await self._create_shell(r'\adb devices', 5)
             adb_res = res[0].decode().split('\r\n')   
@@ -162,12 +155,17 @@ class Flasher:
                 adb_res = adb_res[0].split('\n')
 
             if adb_res[1] != '':
-                await self._print_msg('INFO', f'Waited for ADB Devices {i} sec')
-                return adb_res
+                break
             
             await asyncio.sleep(1)
+
+        if adb_res[1] == '':
+            await self._print_msg('ERROR', f'No ADB device found')
+        else:
+            await self._print_msg('OK', 'ADB device found!')
+            return True
         
-        return adb_res
+        return False
 
     async def _setUpModem(self):
         """Set some modem parameters"""
@@ -177,15 +175,21 @@ class Flasher:
             await asyncio.sleep(20)
             for i in range(10):
                 try:
-                    resp = await self._AT_send_recv(cp, 'AT+CPCMREG=0', 20)
+                    resp = await self._AT_send_recv(cp, 'AT', 20)
                     if resp == ['OK']:
-                        await self._print_msg('OK', f'CPCMREG0 ok in {i} sec')
+                        await self._print_msg('OK', f'AT ok in {i} sec')
+                        return True
 
-                    resp = await self._AT_send_recv(cp, 'ATE0', 20)
-                    if resp == ['OK']:
-                        await self._print_msg('OK', f'ATE0 ok in {i} sec')
-                        
-                    return True
+                    # AT terminal starts before modem, so it will
+                    # send this msg. Before calling this function you have to
+                    # wait about 10-30 sec after reboot while modem is starting.
+                    # But if it's not enough just try to call this function one more time  
+                    if '+CME ERROR: SIM not inserted' in resp:
+                        await self._print_msg('INFO', f'SIM not found in {i} sec')
+
+                    if '+CPCMREG: (0-1)' in resp:
+                        await self._print_msg('INFO', f'CPCMREG msg in {i} sec')
+
                 except Exception:
                     await self._print_msg('WARNING', 'Port error. Reopen')
                     try:
@@ -194,14 +198,13 @@ class Flasher:
                     await self._waitForPort(cp, 10)
 
                 await asyncio.sleep(1)
-        
 
+        return False
+        
     async def _setAdbMode(self):
         """Set modem ADB mode"""
         cp = ComPort()
         if await self._waitForPort(cp, 15):
-            # Wait untill modem starts
-            # await asyncio.sleep(20)
             for i in range(10):
                 try:
                     # Send ADM take on command
@@ -251,8 +254,6 @@ class Flasher:
         """Get firmware version of modem"""
         cp = ComPort()
         if await self._waitForPort(cp, 20):
-            # Wait untill modem starts
-            await asyncio.sleep(20)
             for i in range(20):
                 try:
                     fw = await self._AT_send_recv(cp, 'at+GMR', 20)
@@ -277,8 +278,6 @@ class Flasher:
         """Get flag of correct\incorrect modem state"""
         cp = ComPort()
         if await self._waitForPort(cp, 10):
-            # You don't have to wait here like in '_get_fw_version'
-            # because modem is already started
             for i in range(20):
                 try:
                     fun = await self._AT_send_recv(cp, 'at+CFUN?', 20)           
@@ -400,15 +399,9 @@ class Flasher:
         await self._print_msg('INFO', f'')
 
         # Check until adb device is not founв or timeout what is less
-        adb_devices = await self._getAdbDevices()
-
-        # if adb device was found go next, otherwise return
-        if adb_devices[1] == '':
-            await self._print_msg('ERROR', f'No ADB device found')
+        if not await self._getAdbDevices():
             return False
-        else:
-            await self._print_msg('OK', 'ADB device found!')
-        
+
         # Just \n in logs
         await self._print_msg('INFO', f'')
 
@@ -441,6 +434,14 @@ class Flasher:
 
         # Reboot in normal mode
         await self._setNormalMode()
+
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
+        await self._print_msg('INFO', f'-----> SETUP MODEM <-----')
+
+        # Try send setup commands
+        if not await self._setUpModem():
+            return False
 
         # Just \n in logs
         await self._print_msg('INFO', f'')
