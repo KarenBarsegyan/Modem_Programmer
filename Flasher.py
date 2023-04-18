@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '0.2.4'
+VERSION = '0.2.5'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -231,8 +231,16 @@ class Flasher:
         try:
             cp.closePort()
         except: pass
+
+        # Take off Relay
+        gpio.output(RELAY_PIN, gpio.HIGH)
+
+        await asyncio.sleep(5)
+
+        # Take on Relay
+        gpio.output(RELAY_PIN, gpio.LOW)
         
-        await self._reset_usb()
+        # await self._reset_usb()
         await self._waitForPort(cp, 10)
 
     async def _setUpModem(self) -> bool:
@@ -285,11 +293,7 @@ class Flasher:
                             return True
                 
                 except Exception:
-                    await self._print_msg('WARNING', 'Port error. Reopen')
-                    try:
-                        cp.closePort()
-                    except: pass
-                    await self._waitForPort(cp, 10)
+                    await self._reopen_usb(cp)
 
                 await asyncio.sleep(1)
         
@@ -522,7 +526,7 @@ class Flasher:
         if not await self._get_fun(): 
             return False
         
-        await asyncio.sleep(1)
+        await asyncio.sleep(5)
         
         # Take off relay
         gpio.output(RELAY_PIN, gpio.HIGH)
