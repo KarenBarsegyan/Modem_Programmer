@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '0.2.3'
+VERSION = '0.2.4'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -210,12 +210,32 @@ class Flasher:
             except:
                 pass
 
+        proc = await asyncio.create_subprocess_shell(
+            'lsusb', 
+            shell=True,
+            stdout=asyncio.subprocess.PIPE
+        )
+        cmd_output, a = await proc.communicate()
+        usb_device_list = cmd_output.decode().split('\n')
+        for device in usb_device_list:
+            if USB_DEV_NAME in device:
+                await self._print_msg('INFO', f'Device found')
+                usb_dev_details = device.split()
+                usb_bus = usb_dev_details[1]
+                usb_dev = usb_dev_details[3][:3]
+                usb_dev_path = '/dev/bus/usb/%s/%s' % (usb_bus, usb_dev)
+
     async def _reopen_usb(self, cp):
         await self._print_msg('WARNING', 'Port error. Resetting')
+        
+        try:
+            cp.closePort()
+        except: pass
+        
         await self._reset_usb()
         await self._waitForPort(cp, 10)
 
-    async def _setUpModem(self):
+    async def _setUpModem(self) -> bool:
         """Set some modem parameters"""
         cp = ComPort()
         if await self._waitForPort(cp, 15):
@@ -246,7 +266,7 @@ class Flasher:
 
         return False
         
-    async def _setAdbMode(self):
+    async def _setAdbMode(self) -> bool:
         """Set modem ADB mode"""
         cp = ComPort()
         if await self._waitForPort(cp, 15):
@@ -276,30 +296,35 @@ class Flasher:
         await self._print_msg('ERROR', f'ADB was not taken on')
         return False
 
-    async def _setBootloaderMode(self):
+    async def _setBootloaderMode(self) -> bool:
         """Reboot device in bootloader (fastboot) mode"""
         try:
-            res = await self._create_shell(r'\adb reboot bootloader', 15)
+            res = await self._create_shell(r'\adb reboot bootloader', 20)
             if res[2]:
                 await self._print_msg('OK', 'SetBootloaderMode Ok')
+                return True
         except Exception:
             await self._print_msg('ERROR', 'SetBootloaderMode Error')
+        
+        return False
 
-    async def _setNormalMode(self):
+    async def _setNormalMode(self) -> bool:
         """Reboot device in normal (adb) mode"""
         try:
-            res = await self._create_shell(r'\fastboot reboot', 15)
+            res = await self._create_shell(r'\fastboot reboot', 20)
             if res[2]:
                 await self._print_msg('OK', 'SetNormalMode Ok')
-
+                return True
         except Exception:
             await self._print_msg('ERROR', 'SetNormalMode Error')
+
+        return False
 
     async def _get_fw_version(self) -> bool:
         """Get firmware version of modem"""
         cp = ComPort()
         if await self._waitForPort(cp, 20):
-            for i in range(20):
+            for i in range(10):
                 try:
                     fw = await self._AT_send_recv(cp, 'at+GMR', 20)
                     if '+GMR:' in fw[0] and fw[1] == 'OK' and len(fw) == 2:
@@ -319,7 +344,7 @@ class Flasher:
         """Get flag of correct\incorrect modem state"""
         cp = ComPort()
         if await self._waitForPort(cp, 10):
-            for i in range(20):
+            for i in range(10):
                 try:
                     fun = await self._AT_send_recv(cp, 'at+CFUN?', 20)           
                     if fun == ['+CFUN: 1', 'OK']:
@@ -450,7 +475,8 @@ class Flasher:
         await self._print_msg('INFO', f'-----> FLASH MODEM <-----')
 
         # Take on bootloader mode to get ready for flashing
-        await self._setBootloaderMode()
+        if not await self._setBootloaderMode():
+            return False
         await asyncio.sleep(2)
 
         # Just \n in logs
@@ -470,7 +496,8 @@ class Flasher:
         await self._print_msg('INFO', f'')
 
         # Reboot in normal mode
-        await self._setNormalMode()
+        if not await self._setNormalMode():
+            return False
 
         # Just \n in logs
         await self._print_msg('INFO', f'')
