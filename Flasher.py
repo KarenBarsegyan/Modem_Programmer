@@ -6,7 +6,7 @@ from async_timeout import timeout
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.2.0'
+VERSION = '0.2.1'
 
 log = logger(__name__, logger.INFO, indent=75)
 
