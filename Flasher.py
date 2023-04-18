@@ -2,10 +2,11 @@ import sys
 from ComPort import ComPort
 from logger import logger
 import asyncio
+from async_timeout import timeout
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.1.9'
+VERSION = '0.2.0'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -62,27 +63,6 @@ class Flasher:
 
         else:
             raise Exception('Wrong log level')
-
-
-    async def _test(self):
-        # for i in range(30):
-        
-        print('aaa')
-        proc = await asyncio.create_subprocess_shell(
-            'bash ~/Work/Modem_Programmer/while.sh ',
-            shell=True,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        print('bbb')
-
-        await asyncio.sleep(3)
-        await proc.terminate()
-        stdout, stderr = await proc.communicate()
-        print('ccc')
-        print(stdout.decode().split('\n'))
-        print('ddd')
-        
 
     async def _waitForPort(self, cp, secs) -> bool:
         """Try get usb device until some found & open port"""
@@ -176,20 +156,8 @@ class Flasher:
     async def _getAdbDevices(self):
         """Get list of ADB devices"""
         for i in range(25):
-            try:
-                proc = await asyncio.create_subprocess_shell(
-                    self._adb_fastboot_path + r'\adb devices',
-                    shell=True,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                stdout, stderr = await proc.communicate()
-                adb_res = stdout.decode().split('\r\n')
-            
-            except Exception:
-                await self._print_msg('ERROR', 'GetAdbDevices command Error')
-                adb_res = []
-
+            res = await self._create_shell(r'\adb devices', 5)
+            adb_res = res[0].decode().split('\r\n')   
             if sys.platform.startswith('linux'):
                 adb_res = adb_res[0].split('\n')
 
@@ -206,7 +174,7 @@ class Flasher:
         cp = ComPort()
         if await self._waitForPort(cp, 15):
             # Wait untill modem starts
-            await asyncio.sleep(10)
+            await asyncio.sleep(20)
             for i in range(10):
                 try:
                     # Send ADM take on command
@@ -223,8 +191,10 @@ class Flasher:
                 
                 except Exception:
                     await self._print_msg('WARNING', 'Port error. Reopen')
-                    cp.closePort()
-                    await self._waitForPort(cp, 3)
+                    try:
+                        cp.closePort()
+                    except: pass
+                    await self._waitForPort(cp, 10)
 
                 await asyncio.sleep(1)
         
@@ -234,13 +204,7 @@ class Flasher:
     async def _setBootloaderMode(self):
         """Reboot device in bootloader (fastboot) mode"""
         try:
-            proc = await asyncio.create_subprocess_shell(
-                self._adb_fastboot_path + r'\adb reboot bootloader',
-                shell=True,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await proc.communicate()
+            await self._create_shell(r'\adb reboot bootloader', 15)
             await self._print_msg('OK', 'SetBootloaderMode Ok')
         except Exception:
             await self._print_msg('ERROR', 'SetBootloaderMode Error')
@@ -248,13 +212,7 @@ class Flasher:
     async def _setNormalMode(self):
         """Reboot device in normal (adb) mode"""
         try:
-            proc = await asyncio.create_subprocess_shell(
-                self._adb_fastboot_path + r'\fastboot reboot',
-                shell=True,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )   
-            stdout, stderr = await proc.communicate()
+            await self._create_shell(r'\fastboot reboot', 15)
             await self._print_msg('OK', 'SetNormalMode Ok')
         except Exception:
             await self._print_msg('ERROR', 'SetNormalMode Error')
@@ -264,7 +222,7 @@ class Flasher:
         cp = ComPort()
         if await self._waitForPort(cp, 20):
             # Wait untill modem starts
-            await asyncio.sleep(10)
+            await asyncio.sleep(20)
             for i in range(20):
                 try:
                     fw = await self._AT_send_recv(cp, 'at+GMR', 20)
@@ -275,8 +233,10 @@ class Flasher:
                 
                 except Exception:
                     await self._print_msg('WARNING', 'Port error. Reopen')
-                    cp.closePort()
-                    await self._waitForPort(cp, 3)
+                    try:
+                        cp.closePort()
+                    except: pass
+                    await self._waitForPort(cp, 10)
 
                 await asyncio.sleep(1)
 
@@ -295,169 +255,94 @@ class Flasher:
                     if fun == ['+CFUN: 1', 'OK']:
                         await self._print_msg('OK', f'FUN ok in {i} sec')
                         return True
-                    elif fun[1] == 'OK' and len(fun) == 2 :
+                    elif '+CFUN' in fun[0] and fun[1] == 'OK' and len(fun) == 2 :
                         await self._print_msg('ERROR', f'Fun != 1')
                         return False
                 
                 except Exception:
                     await self._print_msg('WARNING', 'Port error. Reopen')
-                    cp.closePort()
-                    await self._waitForPort(cp, 3)
+                    try:
+                        cp.closePort()
+                    except: pass
+                    await self._waitForPort(cp, 10)
 
                 await asyncio.sleep(1)
 
         await self._print_msg('ERROR', f'Get fun Error')
         return False
 
-    async def _communicate(self, proc):
-            stdout, stderr = await proc.communicate()
-            msgs = stderr.decode().split('\n')
-            for msg in msgs[:len(msgs)-1]:
-                await self._print_msg('INFO', msg)
-
-    async def _fastbootFlashAboot(self):
+    async def _create_shell(self, cmd: str, secs):
         try:
-            proc = await asyncio.create_subprocess_shell(
-                self._adb_fastboot_path + r'\fastboot flash aboot ' + self._fw_path + r'\appsboot.mbn',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await self._communicate(proc)
-            return True
-            
-        except Exception:
-            await self._print_msg('ERROR', 'FastbootFlashAboot Error')
-            return False
+            async with timeout(secs):
+                try:
+                    proc = await asyncio.create_subprocess_shell(
+                        self._adb_fastboot_path + cmd,
+                        shell=True,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout, stderr = await proc.communicate()
+                    msgs = stderr.decode().split('\n')
+                    for msg in msgs[:len(msgs)-1]:
+                        await self._print_msg('INFO', msg)
+                    
+                    return stdout, stderr, True
+                
+                except Exception:
+                    await self._print_msg('ERROR', f'CMD {cmd} Error')
+                    return '', '', False
 
-    async def _fastbootFlashRpm(self):
-        try:
-            proc = await asyncio.create_subprocess_shell(
-                self._adb_fastboot_path + r'\fastboot flash rpm ' + self._fw_path + r'\rpm.mbn',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await self._communicate(proc)
-            return True
-
-        except Exception:
-            await self._print_msg('ERROR', 'FastbootFlashRpm Error')
-            return False
-
-    async def _fastbootFlashSbl(self):
-        try:
-            proc = await asyncio.create_subprocess_shell(
-                self._adb_fastboot_path + r'\fastboot flash sbl ' + self._fw_path + r'\sbl1.mbn',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await self._communicate(proc)
-            return True
-    
-        except Exception:
-            await self._print_msg('ERROR', 'FastbootFlashSbl Error')
-            return False
-
-    async def _fastbootFlashTz(self):
-        try:
-            proc = await asyncio.create_subprocess_shell(
-                self._adb_fastboot_path + r'\fastboot flash tz ' + self._fw_path + r'\tz.mbn',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await self._communicate(proc)
-            return True
-            
-        except Exception:
-            await self._print_msg('ERROR', 'FastbootFlashTz Error')
-            return False
-
-    async def _fastbootFlashModem(self):
-        try:
-            proc = await asyncio.create_subprocess_shell(
-                self._adb_fastboot_path + r'\fastboot flash modem ' + self._fw_path + r'\modem.img',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await self._communicate(proc)
-            return True
-
-        except Exception:
-            await self._print_msg('ERROR', 'FastbootFlashModem Error')
-            return False
-
-    async def _fastbootFlashBoot(self):
-        try:
-            proc = await asyncio.create_subprocess_shell(
-                self._adb_fastboot_path + r'\fastboot flash boot ' + self._fw_path + r'\boot.img',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await self._communicate(proc)
-            return True
-
-        except Exception:
-            await self._print_msg('ERROR', 'FastbootFlashBoot Error')
-            return False
-
-    async def _fastbootFlashSystem(self):
-        try:
-            proc = await asyncio.create_subprocess_shell(
-                self._adb_fastboot_path + r'\fastboot flash system ' + self._fw_path + r'\system.img',
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await self._communicate(proc)
-            return True
-
-        except Exception:
-            await self._print_msg('ERROR', 'FastbootFlashSystem Error')
-            return False
+        except asyncio.exceptions.TimeoutError: 
+            await self._print_msg('ERROR', f'CMD {cmd} timeout')
+            return '', '', False
 
     async def _fastbootFlash(self) -> bool:
-        await self._print_msg(f'INFO', 'FastbootFlashAboot')
-        if not await self._fastbootFlashAboot():
-            await self._print_msg(f'ERROR', 'FastbootFlashAboot Error')
-            return False
+        res = await self._create_shell(r'\fastboot flash aboot '  + self._fw_path + 
+                                       r'\appsboot.mbn', 5)
+        if not res[2]: return False
+        
         await self._print_msg(f'INFO', '------------------')
-        await self._print_msg(f'INFO', 'FastbootFlashSbl')
-        if not await self._fastbootFlashSbl():
-            await self._print_msg(f'ERROR', 'FastbootFlashSbl Error')
-            return False
+
+        res = await self._create_shell(r'\fastboot flash sbl '    + self._fw_path + 
+                                       r'\sbl1.mbn',     5)
+        if not res[2]: return False
+
         await self._print_msg(f'INFO', '------------------')
-        await self._print_msg(f'INFO', 'FastbootFlashTz')
-        if not await self._fastbootFlashTz():
-            await self._print_msg(f'ERROR', 'FastbootFlashTz Error')
-            return False
+
+        res = await self._create_shell(r'\fastboot flash tz '     + self._fw_path + 
+                                       r'\tz.mbn',       5)
+        if not res[2]: return False
+
         await self._print_msg(f'INFO', '------------------')
-        await self._print_msg(f'INFO', 'FastbootFlashRpm')
-        if not await self._fastbootFlashRpm():
-            await self._print_msg(f'ERROR', 'FastbootFlashRpm Error')
-            return False
-        await self._print_msg(f'INFO', '------------------')
-        await self._print_msg(f'INFO', 'FastbootFlashModem')
-        if not await self._fastbootFlashModem():
-            await self._print_msg(f'ERROR', 'FastbootFlashModem Error')
-            return False
-        await self._print_msg(f'INFO', '------------------')
-        await self._print_msg(f'INFO', 'FastbootFlashBoot')
-        if not await self._fastbootFlashBoot():
-            await self._print_msg(f'ERROR', 'FastbootFlashBoot Error')
-            return False
-        await self._print_msg(f'INFO', '------------------')
-        await self._print_msg(f'INFO', 'FastbootFlashSystem')
-        if not await self._fastbootFlashSystem():
-            await self._print_msg(f'ERROR', 'FastbootFlashSystem Error')
-            return False
+        
+        res = await self._create_shell(r'\fastboot flash rpm '    + self._fw_path + 
+                                       r'\rpm.mbn',      5)
+        if not res[2]: return False
+
+        res = await self._print_msg(f'INFO', '------------------')
+
+        res = await self._create_shell(r'\fastboot flash modem '  + self._fw_path + 
+                                       r'\modem.img',    20)
+        if not res[2]: return False
+
+        res = await self._print_msg(f'INFO', '------------------')
+
+        res = await self._create_shell(r'\fastboot flash boot '   + self._fw_path + 
+                                       r'\boot.img',     10)
+        if not res[2]: return False
+
+        res = await self._print_msg(f'INFO', '------------------')
+
+        res = await self._create_shell(r'\fastboot flash system ' + self._fw_path + 
+                                       r'\system.img',   30)
+        if not res[2]: return False
+
         return True
 
     async def flashModem(self, comport) -> bool:
         start_time = time.time()
 
         self._port = comport
-
-        # print('lol')
-        # await self._test()
-        # print('kek')
 
         await self._print_msg('INFO', f'Flasher Version: {VERSION}')
 
