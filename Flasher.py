@@ -5,7 +5,7 @@ import asyncio
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.1.6'
+VERSION = '0.1.7'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -156,7 +156,7 @@ class Flasher:
 
                 # AT terminal starts before modem, so it will
                 # send this msg. Before calling this function you have to
-                # wait about 10-15 sec after reboot while modem is starting.
+                # wait about 10-30 sec after reboot while modem is starting.
                 # But if it's not enough just try to call this function one more time  
                 if '+CME ERROR: SIM not inserted' in resp:
                     await self._print_msg('WARNING', f'SIM not found in {time} sec')
@@ -206,7 +206,7 @@ class Flasher:
         cp = ComPort()
         if await self._waitForPort(cp, 15):
             # Wait untill modem starts
-            await asyncio.sleep(15)
+            await asyncio.sleep(20)
             for i in range(10):
                 try:
                     # Send ADM take on command
@@ -261,7 +261,7 @@ class Flasher:
         cp = ComPort()
         if await self._waitForPort(cp, 20):
             # Wait untill modem starts
-            await asyncio.sleep(15)
+            await asyncio.sleep(20)
             for i in range(20):
                 try:
                     fw = await self._AT_send_recv(cp, 'at+GMR', 20)
