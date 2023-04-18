@@ -5,7 +5,7 @@ import asyncio
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.1.5'
+VERSION = '0.1.6'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -16,9 +16,11 @@ class Flasher:
         self._flash_thread = None
         self._websocket = websocket
 
+        # Path to ADB, Fastboot and FlashData from apt server
         self._adb_fastboot_path = '/usr/lib/android-sdk/platform-tools/'
         self._fw_path = '/home/pi/FlashData/'
         
+        # Relay pin setup
         gpio.setmode(gpio.BCM)
         gpio.setup(RELAY_PIN, gpio.OUT)
         gpio.output(RELAY_PIN, gpio.HIGH)
@@ -38,8 +40,10 @@ class Flasher:
         return True
 
     async def _print_msg(self, level: str, msg: str):
-        # Print log in file and send log in websocket
-        # with corresponding level
+        """
+        Print log in file and send log in websocket
+        with corresponding level
+        """
         if level == 'INFO':
             log.info_no_lineo(msg, str(sys._getframe(1).f_lineno))
             await self._websocket.send('Log', msg)
@@ -61,7 +65,6 @@ class Flasher:
 
 
     async def _test(self):
-        """Get list of ADB devices"""
         # for i in range(30):
         
         print('aaa')
@@ -101,48 +104,72 @@ class Flasher:
             await asyncio.sleep(1)
         
         if not found:
-            await self._print_msg('ERROR', f'Waited for com port ERROR')
+            await self._print_msg('ERROR', f'Com port not found. {secs} sec tried')
 
         return found
 
     async def _AT_send_recv(self, cp, cmd, secs):
         """Send and receive AT command"""
         cp.flushPort()
+        await self._print_msg('INFO', f'Send: {cmd}')
         cp.sendATCommand(cmd)
 
         resp = ''
         ansGot = False
+        time = 0
         for i in range(secs):
+            # Try to read COM port
+            # If nothing there, try after one sec
             resp_raw = cp.getATResponse()
             
+            # If smth found
             if resp_raw != '':
+                # Try to wait a bit more, 
+                # mayby SIM is trying to send more msgs
                 await asyncio.sleep(0.5)
+                time = time + 0.5
                 new_resp = cp.getATResponse()
+
+                # Do it while SIM sends smth. 
+                # Sometimes it can happen 2 or 3 times
                 while new_resp != '':
                     await asyncio.sleep(0.5)
+                    time = time + 0.5
                     resp_raw += new_resp
                     new_resp_split = new_resp.split('\r\n')
-                    await self._print_msg('INFO', f'Added resp: {new_resp_split}')
+                    await self._print_msg('INFO', f'Added to resp: {new_resp_split}')
                     new_resp = cp.getATResponse()
 
+                # Parce data: delete all \r and \n
+                # Sometimes SIM sends smth like
+                # "cmd \r\r\n\n cmd" so just .split(\r\n)
+                # is not enough
                 resp = []
                 for chr in resp_raw.split('\r\n'):
                     if chr != '' and chr != '\r' and chr != '\n':
+                        chr = chr.replace('\r', '')
+                        chr = chr.replace('\n', '')
                         resp.append(chr)
-                    
+
+                await self._print_msg('INFO', f'At response got in {time} sec')
+                await self._print_msg('INFO', f'AT response: {resp}')   
+
+                # AT terminal starts before modem, so it will
+                # send this msg. Before calling this function you have to
+                # wait about 10-15 sec after reboot while modem is starting.
+                # But if it's not enough just try to call this function one more time  
                 if '+CME ERROR: SIM not inserted' in resp:
-                    await self._print_msg('WARNING', f'SIM not found in {i} sec')
+                    await self._print_msg('WARNING', f'SIM not found in {time} sec')
                     return []
 
                 ansGot = True
-                await self._print_msg('INFO', f'At response got in {i} sec')
-                await self._print_msg('INFO', f'AT response: {resp}')
                 break
 
             await asyncio.sleep(1)
+            time = time + 1
 
         if not ansGot:
-            await self._print_msg('WARNING', f'AT ans not gotten')
+            await self._print_msg('WARNING', f'AT ans not gotten. {time} sec tried')
 
         return resp
     
@@ -160,7 +187,7 @@ class Flasher:
                 adb_res = stdout.decode().split('\r\n')
             
             except Exception:
-                await self._print_msg('ERROR', 'GetAdbDevices Error')
+                await self._print_msg('ERROR', 'GetAdbDevices command Error')
                 adb_res = []
 
             if sys.platform.startswith('linux'):
@@ -178,14 +205,20 @@ class Flasher:
         """Set modem ADB mode"""
         cp = ComPort()
         if await self._waitForPort(cp, 15):
+            # Wait untill modem starts
             await asyncio.sleep(15)
             for i in range(10):
                 try:
+                    # Send ADM take on command
                     resp = await self._AT_send_recv(cp, 'at+cusbadb=1', 20)
-                    if resp == ['OK'] or resp == ['at+cusbadb=1\r', 'OK']:
+                    if resp == ['OK'] or resp == ['at+cusbadb=1', 'OK']:
+                        # If modem sends 'OK' then we can reboot it.
+                        # After that modem goes in ADB mode
+                        await self._print_msg('OK', f'Cusbadb ok in {i} sec')
                         resp = await self._AT_send_recv(cp, 'at+creset', 20)
                         if resp == ['OK']:
-                            await self._print_msg('INFO', f'ADB mode is taken on succesfully in {i} sec')
+                            # If modem sends 'OK' we can start waiting until reboot
+                            await self._print_msg('OK', f'Creset ok in {i} sec')
                             return True
                 
                 except Exception: pass
@@ -199,13 +232,13 @@ class Flasher:
         """Reboot device in bootloader (fastboot) mode"""
         try:
             proc = await asyncio.create_subprocess_shell(
-                 self._adb_fastboot_path + r'\adb reboot bootloader',
+                self._adb_fastboot_path + r'\adb reboot bootloader',
                 shell=True,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
             stdout, stderr = await proc.communicate()
-
+            await self._print_msg('OK', 'SetBootloaderMode Ok')
         except Exception:
             await self._print_msg('ERROR', 'SetBootloaderMode Error')
 
@@ -219,19 +252,21 @@ class Flasher:
                 stderr=asyncio.subprocess.PIPE
             )   
             stdout, stderr = await proc.communicate()
-
+            await self._print_msg('OK', 'SetNormalMode Ok')
         except Exception:
             await self._print_msg('ERROR', 'SetNormalMode Error')
 
     async def _get_fw_version(self) -> bool:
+        """Get firmware version of modem"""
         cp = ComPort()
         if await self._waitForPort(cp, 20):
+            # Wait untill modem starts
             await asyncio.sleep(15)
             for i in range(20):
                 try:
                     fw = await self._AT_send_recv(cp, 'at+GMR', 20)
                     if '+GMR:' in fw[0] and fw[1] == 'OK' and len(fw) == 2:
-                        await self._print_msg('INFO', f'Waited for FW version {i} sec')
+                        await self._print_msg('OK', f'FW version got ok in {i} sec')
                         await self._print_msg('INFO', f'FW version: {fw[0][6:]}')
                         return True
                 
@@ -243,13 +278,16 @@ class Flasher:
         return False
     
     async def _get_fun(self) -> bool:
+        """Get flag of correct\incorrect modem state"""
         cp = ComPort()
         if await self._waitForPort(cp, 10):
+            # You don't have to wait here like in '_get_fw_version'
+            # because modem is already started
             for i in range(20):
                 try:
                     fun = await self._AT_send_recv(cp, 'at+CFUN?', 20)           
                     if fun == ['+CFUN: 1', 'OK'] :
-                        await self._print_msg('INFO', f'Waited for FUN {i} sec')
+                        await self._print_msg('OK', f'FUN ok in {i} sec')
                         return True
                     elif fun[1] == 'OK' and len(fun) == 2 :
                         await self._print_msg('ERROR', f'Fun != 1')
@@ -413,7 +451,7 @@ class Flasher:
         # print('kek')
 
         await self._print_msg('INFO', f'Flasher Version: {VERSION}')
-        # while True: pass
+
         # Take on Relay
         gpio.output(RELAY_PIN, gpio.LOW)
         await self._print_msg('INFO', f'Start flashing {self._port}')
@@ -425,6 +463,9 @@ class Flasher:
         if not await self._setAdbMode():
             return False
 
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
+
         # Check until adb device is not founв or timeout what is less
         adb_devices = await self._getAdbDevices()
 
@@ -433,13 +474,16 @@ class Flasher:
             await self._print_msg('ERROR', f'No ADB device found')
             return False
         else:
-            await self._print_msg('INFO', 'ADB device found!')
+            await self._print_msg('OK', 'ADB device found!')
         
         # Just \n in logs
         await self._print_msg('INFO', f'')
 
         # Show time from begin of flashing
         await self._print_msg('INFO', f'Time: {(time.time()-start_time):.03f} sec')
+
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
 
         # Take on bootloader mode to get ready for flashing
         await self._setBootloaderMode()
@@ -463,6 +507,9 @@ class Flasher:
 
         # Reboot in normal mode
         await self._setNormalMode()
+
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
 
         # Get firmware version
         if not await self._get_fw_version(): 

@@ -5,7 +5,7 @@ import signal
 import RPi.GPIO as gpio
 import gc
 
-log = logger('sim7600prg', logger.INFO)
+log = logger('sim7600prg', logger.WARNING)
 
 async def main_thread(ws_server, flasher):
     log.info("Main Thread")
