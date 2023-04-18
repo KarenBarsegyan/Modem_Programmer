@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '0.2.6'
+VERSION = '0.2.7'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -248,31 +248,34 @@ class Flasher:
     async def _setUpModem(self) -> bool:
         """Set some modem parameters"""
         cp = ComPort()
-        if await self._waitForPort(cp, 15):
-            # Wait untill modem starts
-            await asyncio.sleep(20)
-           
-            for i in range(10):
-                try:
-                    resp = await self._AT_send_recv(cp, 'AT', 20)
-                    if resp == ['OK']:
-                        await self._print_msg('OK', f'AT ok in {i} sec')
-                        return True
+        for i in range(2):
+            if await self._waitForPort(cp, 15):
+                # Wait untill modem starts
+                await asyncio.sleep(20)
+            
+                for i in range(10):
+                    try:
+                        resp = await self._AT_send_recv(cp, 'AT', 20)
+                        if resp == ['OK']:
+                            await self._print_msg('OK', f'AT ok in {i} sec')
+                            return True
 
-                    # AT terminal starts before modem, so it will
-                    # send this msg. Before calling this function you have to
-                    # wait about 10-30 sec after reboot while modem is starting.
-                    # But if it's not enough just try to call this function one more time  
-                    if '+CME ERROR: SIM not inserted' in resp:
-                        await self._print_msg('INFO', f'SIM not found in {i} sec')
+                        # AT terminal starts before modem, so it will
+                        # send this msg. Before calling this function you have to
+                        # wait about 10-30 sec after reboot while modem is starting.
+                        # But if it's not enough just try to call this function one more time  
+                        if '+CME ERROR: SIM not inserted' in resp:
+                            await self._print_msg('INFO', f'SIM not found in {i} sec')
 
-                    if '+CPCMREG: (0-1)' in resp:
-                        await self._print_msg('INFO', f'CPCMREG msg in {i} sec')
+                        if '+CPCMREG: (0-1)' in resp:
+                            await self._print_msg('INFO', f'CPCMREG msg in {i} sec')
 
-                except Exception:
-                    await self._reopen_usb(cp)
+                    except Exception:
+                        break
 
-                await asyncio.sleep(1)
+                    await asyncio.sleep(1)
+
+            await self._reopen_usb(cp)
 
         return False
         
@@ -305,7 +308,7 @@ class Flasher:
     async def _setBootloaderMode(self) -> bool:
         """Reboot device in bootloader (fastboot) mode"""
         try:
-            res = await self._create_shell(r'\adb reboot bootloader', 20)
+            res = await self._create_shell(r'\adb reboot bootloader', 30)
             if res[2]:
                 await self._print_msg('OK', 'SetBootloaderMode Ok')
                 return True
