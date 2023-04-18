@@ -264,6 +264,7 @@ class Flasher:
             await asyncio.sleep(20)
             for i in range(20):
                 try:
+                    await self._print_msg('INFO', f'Start get fw')
                     fw = await self._AT_send_recv(cp, 'at+GMR', 20)
                     if '+GMR:' in fw[0] and fw[1] == 'OK' and len(fw) == 2:
                         await self._print_msg('OK', f'FW version got ok in {i} sec')
