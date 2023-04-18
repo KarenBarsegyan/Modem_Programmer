@@ -1,15 +1,15 @@
 import sys
 import serial
 from serial.tools.list_ports import comports
+from logger import logger
+
+log = logger(__name__, logger.WARNING)
 
 class ComPort:
     def __init__(self):
         self._com = serial.Serial()
         self._com_name_win = ''
         self._com_name_linux = ''
-
-    # def __del__(self):
-    #     self._com.close()
 
     def getPortsList(self) -> list:
         result = []
@@ -34,25 +34,27 @@ class ComPort:
             try:
                 self._com.open()
             except serial.SerialException:
+                log.error(f'{comport} opening error')
                 raise
         else:
-            print(comport + ' already opened')
+            log.warning(f'{comport} already opened')
 
     def flushPort(self):
         if self._com.isOpen():
             try:
                 self._com.flush()
             except serial.SerialException:
-                print('Couldn\'t flush COM')
+                log.error(f'Flush error')
+                raise
 
     def closePort(self):
         if self._com.isOpen():
             try:
                 self._com.close()
             except serial.SerialException:
-                print('Couldn\'t close COM port')
+                log.error(f'Couldn\'t close COM port')
         else:
-            print('Port already closed')
+             log.warning(f'Port already closed')
 
     def sendATCommand(self, cmd=''):
         cmd = cmd + '\x0D'  # символ возврата каретки - нужен для воспринятия AT команды модемом

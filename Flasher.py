@@ -5,7 +5,7 @@ import asyncio
 import RPi.GPIO as gpio
 import time
 
-VERSION = '0.1.7'
+VERSION = '0.1.8'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -110,8 +110,12 @@ class Flasher:
 
     async def _AT_send_recv(self, cp, cmd, secs):
         """Send and receive AT command"""
-        cp.flushPort()
-        await self._print_msg('INFO', f'Send: {cmd}')
+        try:
+            cp.flushPort()
+        except:
+            await self._print_msg('WARNING', f'Flush Error')
+
+        await self._print_msg('INFO', f'Send AT: {cmd}')
         cp.sendATCommand(cmd)
 
         resp = ''
@@ -206,7 +210,7 @@ class Flasher:
         cp = ComPort()
         if await self._waitForPort(cp, 15):
             # Wait untill modem starts
-            await asyncio.sleep(20)
+            await asyncio.sleep(10)
             for i in range(10):
                 try:
                     # Send ADM take on command
@@ -261,10 +265,9 @@ class Flasher:
         cp = ComPort()
         if await self._waitForPort(cp, 20):
             # Wait untill modem starts
-            await asyncio.sleep(20)
+            await asyncio.sleep(10)
             for i in range(20):
                 try:
-                    await self._print_msg('INFO', f'Start get fw')
                     fw = await self._AT_send_recv(cp, 'at+GMR', 20)
                     if '+GMR:' in fw[0] and fw[1] == 'OK' and len(fw) == 2:
                         await self._print_msg('OK', f'FW version got ok in {i} sec')
@@ -287,7 +290,7 @@ class Flasher:
             for i in range(20):
                 try:
                     fun = await self._AT_send_recv(cp, 'at+CFUN?', 20)           
-                    if fun == ['+CFUN: 1', 'OK'] :
+                    if fun == ['+CFUN: 1', 'OK']:
                         await self._print_msg('OK', f'FUN ok in {i} sec')
                         return True
                     elif fun[1] == 'OK' and len(fun) == 2 :
