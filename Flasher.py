@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '0.2.5'
+VERSION = '0.2.6'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -92,7 +92,9 @@ class Flasher:
 
     async def _AT_send_recv(self, cp, cmd, secs):
         """Send and receive AT command"""
-        cp.flushPort()
+        try:
+            cp.flushPort()
+        except: pass
         await self._print_msg('INFO', f'Send AT: {cmd}')
         cp.sendATCommand(cmd)
 
