@@ -169,12 +169,39 @@ class Flasher:
         
         return adb_res
 
+    async def _setUpModem(self):
+        """Set some modem parameters"""
+        cp = ComPort()
+        if await self._waitForPort(cp, 15):
+            # Wait untill modem starts
+            await asyncio.sleep(20)
+            for i in range(10):
+                try:
+                    resp = await self._AT_send_recv(cp, 'AT+CPCMREG=0', 20)
+                    if resp == ['OK']:
+                        await self._print_msg('OK', f'CPCMREG0 ok in {i} sec')
+
+                    resp = await self._AT_send_recv(cp, 'ATE0', 20)
+                    if resp == ['OK']:
+                        await self._print_msg('OK', f'ATE0 ok in {i} sec')
+                        
+                    return True
+                except Exception:
+                    await self._print_msg('WARNING', 'Port error. Reopen')
+                    try:
+                        cp.closePort()
+                    except: pass
+                    await self._waitForPort(cp, 10)
+
+                await asyncio.sleep(1)
+        
+
     async def _setAdbMode(self):
         """Set modem ADB mode"""
         cp = ComPort()
         if await self._waitForPort(cp, 15):
             # Wait untill modem starts
-            await asyncio.sleep(20)
+            # await asyncio.sleep(20)
             for i in range(10):
                 try:
                     # Send ADM take on command
@@ -204,16 +231,19 @@ class Flasher:
     async def _setBootloaderMode(self):
         """Reboot device in bootloader (fastboot) mode"""
         try:
-            await self._create_shell(r'\adb reboot bootloader', 15)
-            await self._print_msg('OK', 'SetBootloaderMode Ok')
+            res = await self._create_shell(r'\adb reboot bootloader', 15)
+            if res[2]:
+                await self._print_msg('OK', 'SetBootloaderMode Ok')
         except Exception:
             await self._print_msg('ERROR', 'SetBootloaderMode Error')
 
     async def _setNormalMode(self):
         """Reboot device in normal (adb) mode"""
         try:
-            await self._create_shell(r'\fastboot reboot', 15)
-            await self._print_msg('OK', 'SetNormalMode Ok')
+            res = await self._create_shell(r'\fastboot reboot', 15)
+            if res[2]:
+                await self._print_msg('OK', 'SetNormalMode Ok')
+
         except Exception:
             await self._print_msg('ERROR', 'SetNormalMode Error')
 
@@ -352,6 +382,15 @@ class Flasher:
 
         # Just \n in logs
         await self._print_msg('INFO', f'')
+        await self._print_msg('INFO', f'-----> SETUP MODEM <-----')
+
+        # Try send setup commands
+        if not await self._setUpModem():
+            return False
+        
+        # Just \n in logs
+        await self._print_msg('INFO', f'')
+        await self._print_msg('INFO', f'-----> TAKE ON ADB <-----')
 
         # Try set ADB mode
         if not await self._setAdbMode():
@@ -378,6 +417,7 @@ class Flasher:
 
         # Just \n in logs
         await self._print_msg('INFO', f'')
+        await self._print_msg('INFO', f'-----> FLASH MODEM <-----')
 
         # Take on bootloader mode to get ready for flashing
         await self._setBootloaderMode()
@@ -404,6 +444,7 @@ class Flasher:
 
         # Just \n in logs
         await self._print_msg('INFO', f'')
+        await self._print_msg('INFO', f'-----> TESTS <-----')
 
         # Get firmware version
         if not await self._get_fw_version(): 
