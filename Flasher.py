@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '0.2.7'
+VERSION = '0.2.8'
 
 log = logger(__name__, logger.INFO, indent=75)
 
@@ -148,30 +148,6 @@ class Flasher:
             await self._print_msg('WARNING', f'AT ans not gotten. {time} sec tried')
 
         return resp
-    
-    async def _getAdbDevices(self):
-        """Get list of ADB devices"""
-        adb_res = []
-        time = 0
-        for i in range(25):
-            time = i
-            res = await self._create_shell(r'\adb devices', 5)
-            adb_res = res[0].decode().split('\r\n')   
-            if sys.platform.startswith('linux'):
-                adb_res = adb_res[0].split('\n')
-
-            if adb_res[1] != '':
-                break
-            
-            await asyncio.sleep(1)
-
-        if adb_res[1] == '':
-            await self._print_msg('ERROR', f'No ADB device found in {time} sec')
-        else:
-            await self._print_msg('OK', f'ADB device found in {time} sec')
-            return True
-        
-        return False
 
     async def _reset_usb(self):
         USB_DEV_NAME = 'Qualcomm / Option SimTech'
@@ -227,12 +203,8 @@ class Flasher:
                 usb_dev = usb_dev_details[3][:3]
                 usb_dev_path = '/dev/bus/usb/%s/%s' % (usb_bus, usb_dev)
 
-    async def _reopen_usb(self, cp):
-        await self._print_msg('WARNING', 'Port error. Resetting')
-        
-        try:
-            cp.closePort()
-        except: pass
+    async def _reset_modem(self, cp):
+        await self._print_msg('WARNING', 'Port error. Power off')
 
         # Take off Relay
         gpio.output(RELAY_PIN, gpio.HIGH)
@@ -241,10 +213,9 @@ class Flasher:
 
         # Take on Relay
         gpio.output(RELAY_PIN, gpio.LOW)
-        
-        # await self._reset_usb()
-        await self._waitForPort(cp, 10)
 
+        await self._print_msg('INFO', 'Power on')
+        
     async def _setUpModem(self) -> bool:
         """Set some modem parameters"""
         cp = ComPort()
@@ -253,9 +224,9 @@ class Flasher:
                 # Wait untill modem starts
                 await asyncio.sleep(20)
             
-                for i in range(10):
+                for i in range(5):
                     try:
-                        resp = await self._AT_send_recv(cp, 'AT', 20)
+                        resp = await self._AT_send_recv(cp, 'AT', 10)
                         if resp == ['OK']:
                             await self._print_msg('OK', f'AT ok in {i} sec')
                             return True
@@ -275,34 +246,61 @@ class Flasher:
 
                     await asyncio.sleep(1)
 
-            await self._reopen_usb(cp)
+            try:
+                cp.closePort()
+            except: pass
+
+            await self._reset_modem(cp)
 
         return False
         
     async def _setAdbMode(self) -> bool:
         """Set modem ADB mode"""
         cp = ComPort()
-        if await self._waitForPort(cp, 15):
-            for i in range(10):
+        if await self._waitForPort(cp, 5):
+            for i in range(5):
                 try:
                     # Send ADM take on command
-                    resp = await self._AT_send_recv(cp, 'at+cusbadb=1', 20)
+                    resp = await self._AT_send_recv(cp, 'at+cusbadb=1', 5)
                     if resp == ['OK'] or resp == ['at+cusbadb=1', 'OK']:
                         # If modem sends 'OK' then we can reboot it.
                         # After that modem goes in ADB mode
                         await self._print_msg('OK', f'Cusbadb ok in {i} sec')
-                        resp = await self._AT_send_recv(cp, 'at+creset', 20)
+                        resp = await self._AT_send_recv(cp, 'at+creset', 5)
                         if resp == ['OK']:
                             # If modem sends 'OK' we can start waiting until reboot
                             await self._print_msg('OK', f'Creset ok in {i} sec')
                             return True
                 
-                except Exception:
-                    await self._reopen_usb(cp)
+                except Exception: pass
 
                 await asyncio.sleep(1)
         
         await self._print_msg('ERROR', f'ADB was not taken on')
+        return False
+
+    async def _getAdbDevices(self):
+        """Get list of ADB devices"""
+        adb_res = []
+        time = 0
+        for i in range(25):
+            time = i
+            res = await self._create_shell(r'\adb devices', 10)
+            adb_res = res[0].decode().split('\r\n')   
+            if sys.platform.startswith('linux'):
+                adb_res = adb_res[0].split('\n')
+
+            if adb_res[1] != '':
+                break
+            
+            await asyncio.sleep(1)
+
+        if adb_res[1] == '':
+            await self._print_msg('ERROR', f'No ADB device found in {time} sec')
+        else:
+            await self._print_msg('OK', f'ADB device found in {time} sec')
+            return True
+        
         return False
 
     async def _setBootloaderMode(self) -> bool:
@@ -332,17 +330,16 @@ class Flasher:
     async def _get_fw_version(self) -> bool:
         """Get firmware version of modem"""
         cp = ComPort()
-        if await self._waitForPort(cp, 20):
-            for i in range(10):
+        if await self._waitForPort(cp, 5):
+            for i in range(5):
                 try:
-                    fw = await self._AT_send_recv(cp, 'at+GMR', 20)
+                    fw = await self._AT_send_recv(cp, 'at+GMR', 5)
                     if '+GMR:' in fw[0] and fw[1] == 'OK' and len(fw) == 2:
                         await self._print_msg('OK', f'FW version got ok in {i} sec')
                         await self._print_msg('INFO', f'FW version: {fw[0][6:]}')
                         return True
                 
-                except Exception:
-                    await self._reopen_usb(cp)
+                except Exception: pass
 
                 await asyncio.sleep(1)
 
@@ -352,10 +349,10 @@ class Flasher:
     async def _get_fun(self) -> bool:
         """Get flag of correct\incorrect modem state"""
         cp = ComPort()
-        if await self._waitForPort(cp, 10):
-            for i in range(10):
+        if await self._waitForPort(cp, 5):
+            for i in range(5):
                 try:
-                    fun = await self._AT_send_recv(cp, 'at+CFUN?', 20)           
+                    fun = await self._AT_send_recv(cp, 'at+CFUN?', 5)           
                     if fun == ['+CFUN: 1', 'OK']:
                         await self._print_msg('OK', f'FUN ok in {i} sec')
                         return True
@@ -363,8 +360,7 @@ class Flasher:
                         await self._print_msg('ERROR', f'Fun != 1')
                         return False
                 
-                except Exception:
-                    await self._reopen_usb(cp)
+                except Exception: pass
 
                 await asyncio.sleep(1)
 
@@ -398,25 +394,25 @@ class Flasher:
 
     async def _fastbootFlash(self) -> bool:
         res = await self._create_shell(r'\fastboot flash aboot '  + self._fw_path + 
-                                       r'\appsboot.mbn', 5)
+                                       r'\appsboot.mbn', 10)
         if not res[2]: return False
         
         await self._print_msg(f'INFO', '------------------')
 
         res = await self._create_shell(r'\fastboot flash sbl '    + self._fw_path + 
-                                       r'\sbl1.mbn',     5)
+                                       r'\sbl1.mbn',     10)
         if not res[2]: return False
 
         await self._print_msg(f'INFO', '------------------')
 
         res = await self._create_shell(r'\fastboot flash tz '     + self._fw_path + 
-                                       r'\tz.mbn',       5)
+                                       r'\tz.mbn',       10)
         if not res[2]: return False
 
         await self._print_msg(f'INFO', '------------------')
         
         res = await self._create_shell(r'\fastboot flash rpm '    + self._fw_path + 
-                                       r'\rpm.mbn',      5)
+                                       r'\rpm.mbn',      10)
         if not res[2]: return False
 
         res = await self._print_msg(f'INFO', '------------------')
