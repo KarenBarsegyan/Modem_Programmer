@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '0.2.9'
+VERSION = '0.3.0'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -96,8 +96,9 @@ class Flasher:
         try:
             cp.flushPort()
         except: pass
-        await self._print_msg('INFO', f'Send AT: {cmd}')
         cp.sendATCommand(cmd)
+
+        await self._print_msg('INFO', f'Send AT: {cmd}')
 
         resp = ''
         ansGot = False
@@ -220,7 +221,7 @@ class Flasher:
     async def _setUpModem(self) -> bool:
         """Set some modem parameters"""
         cp = ComPort()
-        for i in range(3):
+        for i in range(2):
             if await self._waitForPort(cp, 15):
                 # Wait untill modem starts
                 await asyncio.sleep(20)
@@ -242,11 +243,11 @@ class Flasher:
                         if '+CPCMREG: (0-1)' in resp:
                             await self._print_msg('INFO', f'CPCMREG msg in {i} sec')
 
-                    except Exception:
-                        break
+                    except Exception: pass
 
                     await asyncio.sleep(1)
-            if i < 2:
+
+            if i == 0:
                 try:
                     cp.closePort()
                 except: pass
@@ -262,12 +263,12 @@ class Flasher:
             for i in range(5):
                 try:
                     # Send ADM take on command
-                    resp = await self._AT_send_recv(cp, 'at+cusbadb=1', 5)
+                    resp = await self._AT_send_recv(cp, 'at+cusbadb=1', 10)
                     if resp == ['OK'] or resp == ['at+cusbadb=1', 'OK']:
                         # If modem sends 'OK' then we can reboot it.
                         # After that modem goes in ADB mode
                         await self._print_msg('OK', f'Cusbadb ok in {i} sec')
-                        resp = await self._AT_send_recv(cp, 'at+creset', 5)
+                        resp = await self._AT_send_recv(cp, 'at+creset', 10)
                         if resp == ['OK']:
                             # If modem sends 'OK' we can start waiting until reboot
                             await self._print_msg('OK', f'Creset ok in {i} sec')
