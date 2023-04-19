@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '0.3.0'
+VERSION = '0.3.1'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -205,7 +205,7 @@ class Flasher:
                 usb_dev = usb_dev_details[3][:3]
                 usb_dev_path = '/dev/bus/usb/%s/%s' % (usb_bus, usb_dev)
 
-    async def _reset_modem(self, cp):
+    async def _reset_modem(self):
         await self._print_msg('WARNING', 'Port error. Power off')
 
         # Take off Relay
@@ -221,7 +221,7 @@ class Flasher:
     async def _setUpModem(self) -> bool:
         """Set some modem parameters"""
         cp = ComPort()
-        for i in range(2):
+        for cnt in range(2):
             if await self._waitForPort(cp, 15):
                 # Wait untill modem starts
                 await asyncio.sleep(20)
@@ -247,12 +247,12 @@ class Flasher:
 
                     await asyncio.sleep(1)
 
-            if i == 0:
+            if cnt == 0:
                 try:
                     cp.closePort()
                 except: pass
 
-                await self._reset_modem(cp)
+                await self._reset_modem()
 
         return False
         
