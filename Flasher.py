@@ -8,9 +8,10 @@ import time
 import os
 import fcntl
 
-VERSION = '0.2.8'
+VERSION = '0.2.9'
 
 log = logger(__name__, logger.INFO, indent=75)
+log_status = logger('FlashStatuses', logger.INFO, indent=75)
 
 RELAY_PIN = 14
 
@@ -219,7 +220,7 @@ class Flasher:
     async def _setUpModem(self) -> bool:
         """Set some modem parameters"""
         cp = ComPort()
-        for i in range(2):
+        for i in range(3):
             if await self._waitForPort(cp, 15):
                 # Wait untill modem starts
                 await asyncio.sleep(20)
@@ -245,12 +246,12 @@ class Flasher:
                         break
 
                     await asyncio.sleep(1)
+            if i < 2:
+                try:
+                    cp.closePort()
+                except: pass
 
-            try:
-                cp.closePort()
-            except: pass
-
-            await self._reset_modem(cp)
+                await self._reset_modem(cp)
 
         return False
         
@@ -333,7 +334,7 @@ class Flasher:
         if await self._waitForPort(cp, 5):
             for i in range(5):
                 try:
-                    fw = await self._AT_send_recv(cp, 'at+GMR', 5)
+                    fw = await self._AT_send_recv(cp, 'at+GMR', 15)
                     if '+GMR:' in fw[0] and fw[1] == 'OK' and len(fw) == 2:
                         await self._print_msg('OK', f'FW version got ok in {i} sec')
                         await self._print_msg('INFO', f'FW version: {fw[0][6:]}')
@@ -352,7 +353,7 @@ class Flasher:
         if await self._waitForPort(cp, 5):
             for i in range(5):
                 try:
-                    fun = await self._AT_send_recv(cp, 'at+CFUN?', 5)           
+                    fun = await self._AT_send_recv(cp, 'at+CFUN?', 15)           
                     if fun == ['+CFUN: 1', 'OK']:
                         await self._print_msg('OK', f'FUN ok in {i} sec')
                         return True
@@ -437,6 +438,7 @@ class Flasher:
 
     async def flashModem(self, comport) -> bool:
         start_time = time.time()
+        start_time_nice_format = time.strftime("%H:%M:%S", time.gmtime())
 
         self._port = comport
 
@@ -444,7 +446,7 @@ class Flasher:
 
         # Take on Relay
         gpio.output(RELAY_PIN, gpio.LOW)
-        await self._print_msg('INFO', f'Start flashing {self._port}')
+        await self._print_msg('INFO', f'Start flashing at {start_time_nice_format}')
 
         # Just \n in logs
         await self._print_msg('INFO', f'')
@@ -452,6 +454,7 @@ class Flasher:
 
         # Try send setup commands
         if not await self._setUpModem():
+            log_status.error(f"First Setup Modem Error. Started in {start_time_nice_format}")
             return False
         
         # Just \n in logs
@@ -460,6 +463,7 @@ class Flasher:
 
         # Try set ADB mode
         if not await self._setAdbMode():
+            log_status.error(f"Set ADB Error. Started in {start_time_nice_format}")
             return False
 
         # Just \n in logs
@@ -467,6 +471,7 @@ class Flasher:
 
         # Check until adb device is not founв or timeout what is less
         if not await self._getAdbDevices():
+            log_status.error(f"Get ADB devices Error. Started in {start_time_nice_format}")
             return False
 
         # Just \n in logs
@@ -481,6 +486,7 @@ class Flasher:
 
         # Take on bootloader mode to get ready for flashing
         if not await self._setBootloaderMode():
+            log_status.error(f"Set bootloader mode Error. Started in {start_time_nice_format}")
             return False
         await asyncio.sleep(2)
 
@@ -489,6 +495,7 @@ class Flasher:
 
         # Flash all of the data step by step
         if not await self._fastbootFlash():
+            log_status.error(f"Flashing Error. Started in {start_time_nice_format}")
             return False
 
         # Just \n in logs
@@ -502,6 +509,7 @@ class Flasher:
 
         # Reboot in normal mode
         if not await self._setNormalMode():
+            log_status.error(f"Set Normal mode Error. Started in {start_time_nice_format}")
             return False
 
         # Just \n in logs
@@ -510,6 +518,7 @@ class Flasher:
 
         # Try send setup commands
         if not await self._setUpModem():
+            log_status.error(f"Second setup Error. Started in {start_time_nice_format}")
             return False
 
         # Just \n in logs
@@ -518,6 +527,7 @@ class Flasher:
 
         # Get firmware version
         if not await self._get_fw_version(): 
+            log_status.error(f"Get FW Error. Started in {start_time_nice_format}")
             return False
         
         # Just \n in logs
@@ -525,6 +535,7 @@ class Flasher:
 
         # Get status flag
         if not await self._get_fun(): 
+            log_status.error(f"Get FUN Error. Started in {start_time_nice_format}")
             return False
         
         await asyncio.sleep(5)
@@ -534,6 +545,7 @@ class Flasher:
         
         await self._print_msg('INFO', f'')
         await self._print_msg('OK', f'Success!')
+        log_status.info(f"Success. Started in {start_time_nice_format}")
 
         # Show time from begin of flashing
         await self._print_msg('INFO', f'Full Time: {(time.time()-start_time):.03f} sec')
