@@ -17,7 +17,7 @@ Next you will see 3 sections:
 
 ### Put rpi SD card in uour PC and do next steps:
 
-1. Download latest *sim76prg* image from [GoogleDrive](https://drive.google.com/drive/folders/1XxYWKCPlGxHbmXVTWYsh-Mkh5s9HJqEX?usp=sharing)
+1. Download latest *sim7600prg* image from [GoogleDrive](https://drive.google.com/drive/folders/1XxYWKCPlGxHbmXVTWYsh-Mkh5s9HJqEX?usp=sharing) and unzip it.
 
 2. Install [RPI Imager](https://www.raspberrypi.com/software/). From linux just run this command:
     
@@ -27,14 +27,16 @@ Next you will see 3 sections:
 
 3. Launch *RPI Imager*, choose recently downloaded sim7600prg.img and SD card. You don't have to manage additional settings (in lover right corner) because it will be replaced with sim7600prg.img settings.
 
-4. After the end of the process go to sd Rootfs and run rename_rpi.bash with rpi num as argument:
+4. Eject SD card and insert it back!!! Sometimes RPI Imager blocks SD card after installing, so you have to reboot it
+
+5. After the end of the process go to sd Rootfs and run rename_rpi.bash with rpi num as argument:
     
     ``` bash
     cd /media/USERNAME/rootfs  
     sudo ./rename_rpi.bash RPI_NUM
     ```
 
-5. Put SD in RPI and start it!
+6. Put SD in RPI and start it!
 
 
 # 2) How to set up **sim7600prg** from source?
