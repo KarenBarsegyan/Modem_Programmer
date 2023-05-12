@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '0.3.1'
+VERSION = '0.3.2'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -560,6 +560,7 @@ class Flasher:
 from Websocket import WebSocketServer
 async def test():
     async with WebSocketServer(ip = '0.0.0.0', port = 8000) as ws_server, Flasher(ws_server) as flasher:
+        print("Start")
         await flasher.flashModem('/dev/ttyUSB2')
 
 if __name__ == '__main__':

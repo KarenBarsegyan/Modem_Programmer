@@ -27,7 +27,7 @@ class ComPort:
 
     def openPort(self, comport: str):
         if not self._com.isOpen():
-            self._com.baudrate = 115200
+            self._com.baudrate = 2400
             self._com.port = comport
             self._com.timeout = 1
             self._com.write_timeout = 1
