@@ -1,6 +1,5 @@
 #!/bin/sh
 
-# APT_SERVER_IP="192.168.88.10:8000"
 APT_SERVER_IP="pi@sim7600server.local:8000"
 
 cd /home/pi/startup
