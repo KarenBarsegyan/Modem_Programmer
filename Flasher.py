@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '0.3.2'
+VERSION = '0.3.3'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -22,7 +22,7 @@ class Flasher:
 
         # Path to ADB, Fastboot and FlashData from apt server
         self._adb_fastboot_path = '/usr/lib/android-sdk/platform-tools/'
-        self._fw_path = '/home/pi/FlashData/'
+        self._fw_path_prefix = '/home/pi/FlashData/'
         
         # Relay pin setup
         gpio.setmode(gpio.BCM)
@@ -396,54 +396,61 @@ class Flasher:
 
     async def _fastbootFlash(self) -> bool:
         res = await self._create_shell(r'\fastboot flash aboot '  + self._fw_path + 
-                                       r'\appsboot.mbn', 10)
+                                       r'appsboot.mbn', 10)
         if not res[2]: return False
         
         await self._print_msg(f'INFO', '------------------')
 
         res = await self._create_shell(r'\fastboot flash sbl '    + self._fw_path + 
-                                       r'\sbl1.mbn',     10)
+                                       r'sbl1.mbn',     10)
         if not res[2]: return False
 
         await self._print_msg(f'INFO', '------------------')
 
         res = await self._create_shell(r'\fastboot flash tz '     + self._fw_path + 
-                                       r'\tz.mbn',       10)
+                                       r'tz.mbn',       10)
         if not res[2]: return False
 
         await self._print_msg(f'INFO', '------------------')
         
         res = await self._create_shell(r'\fastboot flash rpm '    + self._fw_path + 
-                                       r'\rpm.mbn',      10)
+                                       r'rpm.mbn',      10)
         if not res[2]: return False
 
         res = await self._print_msg(f'INFO', '------------------')
 
         res = await self._create_shell(r'\fastboot flash modem '  + self._fw_path + 
-                                       r'\modem.img',    20)
+                                       r'modem.img',    20)
         if not res[2]: return False
 
         res = await self._print_msg(f'INFO', '------------------')
 
         res = await self._create_shell(r'\fastboot flash boot '   + self._fw_path + 
-                                       r'\boot.img',     10)
+                                       r'boot.img',     10)
         if not res[2]: return False
 
         res = await self._print_msg(f'INFO', '------------------')
 
         res = await self._create_shell(r'\fastboot flash system ' + self._fw_path + 
-                                       r'\system.img',   30)
+                                       r'system.img',   30)
         if not res[2]: return False
 
         return True
 
-    async def flashModem(self, comport) -> bool:
+    async def flashModem(self, comport, system) -> bool:
+        self._fw_path = self._fw_path_prefix + system + '/'
+
+        # struct = time.localtime(sec)
+        # print(time.strftime('%d.%m.%Y %H:%M', struct))
+
         start_time = time.time()
         start_time_nice_format = time.strftime("%H:%M:%S", time.gmtime())
 
         self._port = comport
 
         await self._print_msg('INFO', f'Flasher Version: {VERSION}')
+
+        await self._print_msg('INFO', f'Modem System: {system}')
 
         # Take on Relay
         gpio.output(RELAY_PIN, gpio.LOW)
@@ -561,7 +568,7 @@ from Websocket import WebSocketServer
 async def test():
     async with WebSocketServer(ip = '0.0.0.0', port = 8000) as ws_server, Flasher(ws_server) as flasher:
         print("Start")
-        await flasher.flashModem('/dev/ttyUSB2')
+        await flasher.flashModem('/dev/ttyUSB2', 'LE11B14SIM7600M22_211104')
 
 if __name__ == '__main__':
     asyncio.run(test())
