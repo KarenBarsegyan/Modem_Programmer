@@ -79,7 +79,7 @@ class Flasher:
             if found:
                 try:
                     cp.openPort(self._port)
-                    await self._print_msg('INFO', f'Waited for com port: {i} sec')
+                    await self._print_msg('INFO', f'Com port opened succesfully in {i} sec')
                     break
                 except:
                     found = False
@@ -93,12 +93,10 @@ class Flasher:
 
     async def _AT_send_recv(self, cp, cmd, secs):
         """Send and receive AT command"""
-        try:
-            cp.flushPort()
-        except: pass
+
         cp.sendATCommand(cmd)
 
-        await self._print_msg('INFO', f'Send AT: {cmd}')
+        await self._print_msg('INFO', f'Sending AT: {cmd}')
 
         resp = ''
         ansGot = False
@@ -123,7 +121,7 @@ class Flasher:
                     time = time + 0.5
                     resp_raw += new_resp
                     new_resp_split = new_resp.split('\r\n')
-                    await self._print_msg('INFO', f'Added to resp: {new_resp_split}')
+                    await self._print_msg('INFO', f'Added to response: {new_resp_split}')
                     new_resp = cp.getATResponse()
 
                 # Parce data: delete all \r and \n
@@ -147,7 +145,7 @@ class Flasher:
             time = time + 1
 
         if not ansGot:
-            await self._print_msg('WARNING', f'AT ans not gotten. {time} sec tried')
+            await self._print_msg('WARNING', f'AT response not gotten. {time} sec tried')
 
         return resp
 
@@ -224,13 +222,14 @@ class Flasher:
         for cnt in range(2):
             if await self._waitForPort(cp, 15):
                 # Wait untill modem starts
+                await self._print_msg('INFO', f'Waiting 20 sec while AT port starts')
                 await asyncio.sleep(20)
-            
+                
                 for i in range(5):
                     try:
                         resp = await self._AT_send_recv(cp, 'AT', 10)
                         if resp == ['OK']:
-                            await self._print_msg('OK', f'AT ok in {i} sec')
+                            await self._print_msg('OK', f'AT port check succes in {i} sec')
                             return True
 
                         # AT terminal starts before modem, so it will
@@ -238,10 +237,10 @@ class Flasher:
                         # wait about 10-30 sec after reboot while modem is starting.
                         # But if it's not enough just try to call this function one more time  
                         if '+CME ERROR: SIM not inserted' in resp:
-                            await self._print_msg('INFO', f'SIM not found in {i} sec')
+                            await self._print_msg('INFO', f'SIM not found. {i} sec tried')
 
                         if '+CPCMREG: (0-1)' in resp:
-                            await self._print_msg('INFO', f'CPCMREG msg in {i} sec')
+                            await self._print_msg('INFO', f'CPCMREG msg. {i} sec tried')
 
                     except Exception: pass
 
@@ -381,10 +380,14 @@ class Flasher:
                     )
                     stdout, stderr = await proc.communicate()
                     msgs = stderr.decode().split('\n')
+                    
+                    result = True
                     for msg in msgs[:len(msgs)-1]:
                         await self._print_msg('INFO', msg)
-                    
-                    return stdout, stderr, True
+                        if 'FAILED' in msg or 'error' in msg:
+                            result = False
+        
+                    return stdout, stderr, result
                 
                 except Exception:
                     await self._print_msg('ERROR', f'CMD {cmd} Error')
@@ -546,7 +549,7 @@ class Flasher:
             log_status.error(f"Get FUN Error. Started in {start_time_nice_format}")
             return False
         
-        await asyncio.sleep(5)
+        await asyncio.sleep(1)
         
         # Take off relay
         gpio.output(RELAY_PIN, gpio.HIGH)
