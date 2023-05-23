@@ -27,9 +27,9 @@ async def main_thread(ws_server, flasher):
             if cmd == 'Start Flashing':
                 log.info("Flash Started")
 
-                await ws_server.send('Start Flashing', 'Ok')
+                await ws_server.send(f'Start Flashing', 'Ok')
 
-                if await flasher.flashModem('/dev/ttyUSB2'):
+                if await flasher.flashModem('/dev/ttyUSB2', msg):
                     await ws_server.send('End Flashing', 'Ok')
                 else:
                     await ws_server.send('End Flashing', 'Not Ok')
