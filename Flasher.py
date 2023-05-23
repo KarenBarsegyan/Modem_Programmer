@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)

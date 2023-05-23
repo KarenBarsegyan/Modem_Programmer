@@ -4,6 +4,7 @@ from Websocket import WebSocketServer, logger
 import signal
 import RPi.GPIO as gpio
 import gc
+import os
 
 log = logger('sim7600prg', logger.WARNING)
 
@@ -26,13 +27,17 @@ async def main_thread(ws_server, flasher):
             # Start flashing!
             if cmd == 'Start Flashing':
                 log.info("Flash Started")
+                
+                if msg in os.listdir(r'/home/pi/FlashData'):
+                    await ws_server.send(f'Start Flashing', 'Ok')
 
-                await ws_server.send(f'Start Flashing', 'Ok')
-
-                if await flasher.flashModem('/dev/ttyUSB2', msg):
-                    await ws_server.send('End Flashing', 'Ok')
+                    if await flasher.flashModem('/dev/ttyUSB2', msg):
+                        await ws_server.send('End Flashing', 'Ok')
+                    else:
+                        await ws_server.send('End Flashing', 'Not Ok')
                 else:
-                    await ws_server.send('End Flashing', 'Not Ok')
+                    await ws_server.send('LogErr', 'Modem FW not found. Reboot RPI')
+                    await ws_server.send('End Flashing', 'Not Ok')   
 
         except WebSocketServer.ConnectionClosedOk:
             log.info("End of connection")
