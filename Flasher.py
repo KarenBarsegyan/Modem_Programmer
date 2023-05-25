@@ -69,6 +69,9 @@ class Flasher:
 
     async def _waitForPort(self, cp, secs) -> bool:
         """Try get usb device until some found & open port"""
+
+        await self._print_msg('INFO', f'< Wait for com port >')
+
         found = False
         for i in range(secs):
             for port in cp.getPortsList():
@@ -94,9 +97,11 @@ class Flasher:
     async def _AT_send_recv(self, cp, cmd, secs):
         """Send and receive AT command"""
 
+        await self._print_msg('INFO', f'< AT send and receive ans >')
+
         cp.sendATCommand(cmd)
 
-        await self._print_msg('INFO', f'Sending AT: {cmd}')
+        await self._print_msg('INFO', f'Sending AT: \"{cmd}\"')
 
         resp = ''
         ansGot = False
@@ -164,6 +169,8 @@ class Flasher:
         
     async def _setUpModem(self) -> bool:
         """Set some modem parameters"""
+        await self._print_msg('INFO', f'< Setup Modem >')
+
         cp = ComPort()
         for cnt in range(2):
             if await self._waitForPort(cp, 15):
@@ -185,9 +192,6 @@ class Flasher:
                         if '+CME ERROR: SIM not inserted' in resp:
                             await self._print_msg('INFO', f'SIM not found. {i} sec tried')
 
-                        if '+CPCMREG: (0-1)' in resp:
-                            await self._print_msg('INFO', f'CPCMREG msg. {i} sec tried')
-
                     except Exception: pass
 
                     await asyncio.sleep(1)
@@ -201,8 +205,10 @@ class Flasher:
 
         return False
 
-    async def _getAdbDevices(self):
+    async def _setAdbMode(self):
         """Get list of ADB devices"""
+        await self._print_msg('INFO', f'< Get ADB Devices >')
+
         adb_res = []
         time = 0
         for i in range(3):
@@ -238,6 +244,7 @@ class Flasher:
 
     async def _setBootloaderMode(self) -> bool:
         """Reboot device in bootloader (fastboot) mode"""
+        await self._print_msg('INFO', f'< Set bootloader mode >')
         try:
             res = await self._create_shell(r'\adb reboot bootloader', 30)
             if res[2]:
@@ -248,23 +255,38 @@ class Flasher:
         
         return False
 
-    async def _setNormalMode(self) -> bool:
-        """Reboot device in normal (adb) mode"""
+    async def _setNormalModeFastboot(self) -> bool:
+        """Reboot device in normal mode"""
+        await self._print_msg('INFO', f'< Set normal mode from fastboot>')
         try:
             res = await self._create_shell(r'\fastboot reboot', 20)
             if res[2]:
-                await self._print_msg('OK', 'SetNormalMode Ok')
+                await self._print_msg('OK', 'SetNormalMode from fastboot Ok')
                 return True
         except Exception:
-            await self._print_msg('ERROR', 'SetNormalMode Error')
+            await self._print_msg('ERROR', 'SetNormalMode from fastboot Error')
 
         return False
+        
+    async def _setNormalModeADB(self) -> bool:
+        """Reboot device in normal mode"""
+        await self._print_msg('INFO', f'< Set normal mode from adb >')
+        try:
+            res = await self._create_shell(r'\adb reboot', 20)
+            if res[2]:
+                await self._print_msg('OK', 'SetNormalMode from adb Ok')
+                return True
+        except Exception:
+            await self._print_msg('ERROR', 'SetNormalMode from adb Error')
 
+        return False
+    
     async def _get_fw_version(self) -> bool:
         """Get firmware version of modem"""
-        cp = ComPort()
-        if await self._waitForPort(cp, 5):
-            for i in range(5):
+        await self._print_msg('INFO', f'< Get FW version >')
+        for i in range(5):
+            cp = ComPort()
+            if await self._waitForPort(cp, 5):
                 try:
                     fw = await self._AT_send_recv(cp, 'at+GMR', 15)
                     if '+GMR:' in fw[0] and fw[1] == 'OK' and len(fw) == 2:
@@ -274,16 +296,19 @@ class Flasher:
                 
                 except Exception: pass
 
-                await asyncio.sleep(1)
+            cp.closePort()
+            await asyncio.sleep(1)
 
         await self._print_msg('ERROR', f'Get fw version Error')
         return False
     
     async def _get_fun(self) -> bool:
         """Get flag of correct\incorrect modem state"""
-        cp = ComPort()
-        if await self._waitForPort(cp, 5):
-            for i in range(5):
+        await self._print_msg('INFO', f'< Get FUN >')
+        
+        for i in range(5):
+            cp = ComPort()
+            if await self._waitForPort(cp, 5):
                 try:
                     fun = await self._AT_send_recv(cp, 'at+CFUN?', 15)           
                     if fun == ['+CFUN: 1', 'OK']:
@@ -295,12 +320,18 @@ class Flasher:
                 
                 except Exception: pass
 
-                await asyncio.sleep(1)
+            cp.closePort()
+            await asyncio.sleep(1)
 
         await self._print_msg('ERROR', f'Get fun Error')
         return False
 
     async def _create_shell(self, cmd: str, secs):
+        if len(cmd) > 25:
+            await self._print_msg('INFO', f'< Exec: \"...{cmd[-25:]}\">')
+        else:
+            await self._print_msg('INFO', f'< Exec: \"{cmd}\">')
+
         try:
             async with timeout(secs):
                 try:
@@ -314,10 +345,24 @@ class Flasher:
                     msgs = stderr.decode().split('\n')
                     
                     result = True
+                    firststr = True
                     for msg in msgs[:len(msgs)-1]:
+                        if firststr:
+                            firststr = False
+                            await self._print_msg('INFO', 'CMD Stderr:')
+
                         await self._print_msg('INFO', msg)
                         if 'FAILED' in msg or 'error' in msg:
                             result = False
+
+                    msgs = stdout.decode().split('\n')
+                    firststr = True
+                    for msg in msgs[:len(msgs)-1]:
+                        if firststr:
+                            firststr = False
+                            await self._print_msg('INFO', 'CMD Stdout:')
+                    
+                        await self._print_msg('INFO', msg)
         
                     return stdout, stderr, result
                 
@@ -372,56 +417,67 @@ class Flasher:
 
         return True
 
+    async def _writeFactoryNum(self):
+        """Write Factory number"""
+        await self._print_msg('INFO', f'< Write factory number >')
+        try:
+            res = await self._create_shell(r'\adb push factory.cfg /data', 30)
+            if res[2]:
+                await self._print_msg('OK', 'Factory number written Ok')
+                return True
+        except Exception:
+            await self._print_msg('ERROR', 'Factory number write Error')
+        
+        return False
+
     async def flashModem(self, comport, system) -> bool:
         self._fw_path = self._fw_path_prefix + system + '/'
-
         start_time = time.time()
         start_time_nice_format = time.strftime("%H:%M:%S - %d.%m.%Y", time.localtime())
-
         self._port = comport
 
+        # -----> INFO <-----
+
         await self._print_msg('INFO', f'Flasher Version: {VERSION}')
-
         await self._print_msg('INFO', f'Modem System: {system}')
-
         # Take on Relay
         gpio.output(RELAY_PIN, gpio.LOW)
         await self._print_msg('INFO', f'Start flashing at {start_time_nice_format}')
 
-        # Just \n in logs
         await self._print_msg('INFO', f'')
-        await self._print_msg('INFO', f'-----> SETUP MODEM <-----')
+
+        # -----> END INFO <-----
+
+
+
+        # -----> FLASH MODEM <-----
+
+        await self._print_msg('INFO', f'-----> FLASH MODEM <-----')
+        await self._print_msg('INFO', f'') 
+        flash_modem_start_time = time.time()
 
         # Try send setup commands
         if not await self._setUpModem():
             log_status.error(f"First Setup Modem Error. Started in {start_time_nice_format}")
             return False
 
-        # Just \n in logs
         await self._print_msg('INFO', f'')
 
-        # Check until adb device is not founв or timeout what is less
-        if not await self._getAdbDevices():
-            log_status.error(f"Get ADB devices Error. Started in {start_time_nice_format}")
+        # Check until adb device is not found or timeout what is less
+        if not await self._setAdbMode():
+            log_status.error(f"First get ADB devices Error. Started in {start_time_nice_format}")
             return False
 
-        # Just \n in logs
         await self._print_msg('INFO', f'')
 
         # Show time from begin of flashing
         await self._print_msg('INFO', f'Time: {(time.time()-start_time):.03f} sec')
 
-        # Just \n in logs
-        await self._print_msg('INFO', f'')
-        await self._print_msg('INFO', f'-----> FLASH MODEM <-----')
-
         # Take on bootloader mode to get ready for flashing
         if not await self._setBootloaderMode():
             log_status.error(f"Set bootloader mode Error. Started in {start_time_nice_format}")
             return False
-        await asyncio.sleep(2)
 
-        # Just \n in logs
         await self._print_msg('INFO', f'')
 
         # Flash all of the data step by step
@@ -429,39 +485,82 @@ class Flasher:
             log_status.error(f"Flashing Error. Started in {start_time_nice_format}")
             return False
 
-        # Just \n in logs
-        await self._print_msg('INFO', f'')
-
-        # Show time from begin of flashing
-        await self._print_msg('INFO', f'Time: {(time.time()-start_time):.03f} sec')
-
-        # Just \n in logs
         await self._print_msg('INFO', f'')
 
         # Reboot in normal mode
-        if not await self._setNormalMode():
-            log_status.error(f"Set Normal mode Error. Started in {start_time_nice_format}")
+        if not await self._setNormalModeFastboot():
+            log_status.error(f"Set Normal mode from fastboot Error. Started in {start_time_nice_format}")
             return False
 
-        # Just \n in logs
         await self._print_msg('INFO', f'')
-        await self._print_msg('INFO', f'-----> SETUP MODEM <-----')
+
+        await self._print_msg('INFO', f'Flash modem time: {(time.time()-flash_modem_start_time):.03f} sec')
+        
+        await self._print_msg('INFO', f'')
+
+        # -----> FLASH SYSTEM END <-----
+
+
+
+        # -----> WRITE FACTORY NUM <-----
+
+        await self._print_msg('INFO', f'-----> WRITE FACTORY NUM <-----')
+        await self._print_msg('INFO', f'')
+        write_factory_num_start_time = time.time()
 
         # Try send setup commands
         if not await self._setUpModem():
             log_status.error(f"Second setup Error. Started in {start_time_nice_format}")
             return False
-
-        # Just \n in logs
+        
         await self._print_msg('INFO', f'')
+        
+        # Check until adb device is not found or timeout what is less
+        if not await self._setAdbMode():
+            log_status.error(f"Second get ADB devices Error. Started in {start_time_nice_format}")
+            return False
+        
+        await self._print_msg('INFO', f'')
+        
+        if not await self._writeFactoryNum():
+            log_status.error(f"Factory Num write Error. Started in {start_time_nice_format}")
+            return False
+        
+        await self._print_msg('INFO', f'')
+        
+        if not await self._setNormalModeADB():
+            log_status.error(f"Set Normal mode from ADB Error. Started in {start_time_nice_format}")
+            return False
+        
+        await self._print_msg('INFO', f'')
+
+        await self._print_msg('INFO', f'Write factory num time: {(time.time()-write_factory_num_start_time):.03f} sec')
+
+        await self._print_msg('INFO', f'')
+
+        # -----> WRITE FACTORY NUM END <-----
+
+
+
+
+        # -----> TEST MODEM <-----
+
         await self._print_msg('INFO', f'-----> TESTS <-----')
+        await self._print_msg('INFO', f'')
+        test_modem_start_time = time.time()
+
+        # Try send setup commands
+        if not await self._setUpModem():
+            log_status.error(f"Third setup Error. Started in {start_time_nice_format}")
+            return False
+
+        await self._print_msg('INFO', f'')
 
         # Get firmware version
         if not await self._get_fw_version(): 
             log_status.error(f"Get FW Error. Started in {start_time_nice_format}")
             return False
         
-        # Just \n in logs
         await self._print_msg('INFO', f'')
 
         # Get status flag
@@ -469,17 +568,28 @@ class Flasher:
             log_status.error(f"Get FUN Error. Started in {start_time_nice_format}")
             return False
         
+        await self._print_msg('INFO', f'')
+
+        await self._print_msg('INFO', f'Test modem time: {(time.time()-test_modem_start_time):.03f} sec')
+
+        await self._print_msg('INFO', f'')
+
         await asyncio.sleep(1)
+
+        # -----> TEST MODEM END <-----
+
+
         
         # Take off relay
         gpio.output(RELAY_PIN, gpio.HIGH)
         
-        await self._print_msg('INFO', f'')
         await self._print_msg('OK', f'Success!')
         log_status.info(f"Success. Started in {start_time_nice_format}")
 
+
         # Show time from begin of flashing
         await self._print_msg('INFO', f'Full Time: {(time.time()-start_time):.03f} sec')
+        await self._print_msg('INFO', f'')
         await self._print_msg('INFO', f'')
 
         return True
