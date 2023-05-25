@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '0.3.3'
+VERSION = '1.0.0'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -443,11 +443,8 @@ class Flasher:
     async def flashModem(self, comport, system) -> bool:
         self._fw_path = self._fw_path_prefix + system + '/'
 
-        # struct = time.localtime(sec)
-        # print(time.strftime('%d.%m.%Y %H:%M', struct))
-
         start_time = time.time()
-        start_time_nice_format = time.strftime("%H:%M:%S", time.gmtime())
+        start_time_nice_format = time.strftime("%H:%M:%S - %d.%m.%Y", time.localtime())
 
         self._port = comport
 
