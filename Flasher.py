@@ -171,13 +171,13 @@ class Flasher:
         """Set some modem parameters"""
         await self._print_msg('INFO', f'< Setup Modem >')
 
-        cp = ComPort()
-        for cnt in range(2):
+        # Wait untill modem starts
+        await self._print_msg('INFO', f'Waiting 20 sec while AT port starts')
+        await asyncio.sleep(20)
+
+        for cnt in range(3):
+            cp = ComPort()
             if await self._waitForPort(cp, 15):
-                # Wait untill modem starts
-                await self._print_msg('INFO', f'Waiting 20 sec while AT port starts')
-                await asyncio.sleep(20)
-                
                 for i in range(5):
                     try:
                         resp = await self._AT_send_recv(cp, 'AT', 10)
@@ -193,14 +193,11 @@ class Flasher:
                             await self._print_msg('INFO', f'SIM not found. {i} sec tried')
 
                     except Exception: pass
+            
+            cp.closePort()
+            await asyncio.sleep(1)
 
-                    await asyncio.sleep(1)
-
-            if cnt == 0:
-                try:
-                    cp.closePort()
-                except: pass
-
+            if cnt == 1:
                 await self._reset_modem()
 
         return False
