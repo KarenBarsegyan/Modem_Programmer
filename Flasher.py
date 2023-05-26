@@ -23,7 +23,6 @@ class Flasher:
         # Path to ADB, Fastboot and FlashData from apt server
         self._adb_fastboot_path = '/usr/lib/android-sdk/platform-tools/'
         self._fw_path_prefix = '/home/pi/FlashData/'
-        self._factory_path = '/home/pi/Factory/'
         
         # Relay pin setup
         gpio.setmode(gpio.BCM)
@@ -437,22 +436,13 @@ class Flasher:
         model_id = ''
         serial_num = ''
 
-        try:
-            os.mkdir(f'{self._factory_path}')
-        except: pass
+        model_id = factoryNum[:factoryNum.find('#')]
+        serial_num = factoryNum[factoryNum.find('#') + 1:]
 
-        try:
-            with open(f'{self._factory_path}factory.cfg', 'w') as file:
-                model_id = factoryNum[:factoryNum.find('#')]
-                serial_num = factoryNum[factoryNum.find('#') + 1:]
-
-                file.write(model_id)
-                file.write('\n')
-                file.write(serial_num)
-        except:
-            await self._print_msg('ERROR', f'Factory.cfg write error')
-            log_status.error(f"Factory.cfg write error")
-            return False
+        with open(f'factory.cfg', 'w') as file:
+            file.write(model_id)
+            file.write('\n')
+            file.write(serial_num)
 
 
         # -----> INFO <-----

@@ -136,3 +136,5 @@ dmypy.json
 
 # Log files
 log/
+
+factory.cfg
