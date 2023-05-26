@@ -67,13 +67,14 @@ class Flasher:
         else:
             raise Exception('Wrong log level')
 
-    async def _waitForPort(self, cp, secs) -> bool:
+    async def _waitForPort(self, cp, tries) -> bool:
         """Try get usb device until some found & open port"""
 
         await self._print_msg('INFO', f'< Wait for com port >')
+        start_time = time.time()
 
         found = False
-        for i in range(secs):
+        for i in range(tries):
             for port in cp.getPortsList():
                 if self._port.find(port) >= 0:
                     found = True
@@ -82,7 +83,7 @@ class Flasher:
             if found:
                 try:
                     cp.openPort(self._port)
-                    await self._print_msg('INFO', f'Com port opened succesfully in {i} sec')
+                    await self._print_msg('INFO', f'Com port opened succesfully in {(time.time() - start_time):.03f} sec')
                     break
                 except:
                     found = False
@@ -90,14 +91,15 @@ class Flasher:
             await asyncio.sleep(1)
         
         if not found:
-            await self._print_msg('ERROR', f'Com port not found. {secs} sec tried')
+            await self._print_msg('ERROR', f'Com port not found. {(time.time() - start_time):.03f} sec tried')
 
         return found
 
-    async def _AT_send_recv(self, cp, cmd, secs):
+    async def _AT_send_recv(self, cp, cmd, tries):
         """Send and receive AT command"""
 
         await self._print_msg('INFO', f'< AT send and receive ans >')
+        start_time = time.time()
 
         cp.sendATCommand(cmd)
 
@@ -105,8 +107,7 @@ class Flasher:
 
         resp = ''
         ansGot = False
-        time = 0
-        for i in range(secs):
+        for i in range(tries):
             # Try to read COM port
             # If nothing there, try after one sec
             resp_raw = cp.getATResponse()
@@ -116,14 +117,12 @@ class Flasher:
                 # Try to wait a bit more, 
                 # mayby SIM is trying to send more msgs
                 await asyncio.sleep(0.5)
-                time = time + 0.5
                 new_resp = cp.getATResponse()
 
                 # Do it while SIM sends smth. 
                 # Sometimes it can happen 2 or 3 times
                 while new_resp != '':
                     await asyncio.sleep(0.5)
-                    time = time + 0.5
                     resp_raw += new_resp
                     new_resp_split = new_resp.split('\r\n')
                     await self._print_msg('INFO', f'Added to response: {new_resp_split}')
@@ -140,17 +139,16 @@ class Flasher:
                         chr = chr.replace('\n', '')
                         resp.append(chr)
 
-                await self._print_msg('INFO', f'At response got in {time} sec')
+                await self._print_msg('INFO', f'At response got in {(time.time() - start_time):.03f} sec')
                 await self._print_msg('INFO', f'AT response: {resp}')   
 
                 ansGot = True
                 break
 
             await asyncio.sleep(1)
-            time = time + 1
 
         if not ansGot:
-            await self._print_msg('WARNING', f'AT response not gotten. {time} sec tried')
+            await self._print_msg('WARNING', f'AT response not gotten. {(time.time() - start_time):.03f} sec tried')
 
         return resp
 
@@ -170,6 +168,7 @@ class Flasher:
     async def _setUpModem(self) -> bool:
         """Set some modem parameters"""
         await self._print_msg('INFO', f'< Setup Modem >')
+        start_time = time.time()
 
         # Wait untill modem starts
         await self._print_msg('INFO', f'Waiting 20 sec while AT port starts')
@@ -182,7 +181,7 @@ class Flasher:
                     try:
                         resp = await self._AT_send_recv(cp, 'AT', 10)
                         if resp == ['OK']:
-                            await self._print_msg('OK', f'AT port check succes in {i} sec')
+                            await self._print_msg('OK', f'AT port check succes in {(time.time() - start_time):.03f} sec')
                             return True
 
                         # AT terminal starts before modem, so it will
@@ -190,7 +189,7 @@ class Flasher:
                         # wait about 10-30 sec after reboot while modem is starting.
                         # But if it's not enough just try to call this function one more time  
                         if '+CME ERROR: SIM not inserted' in resp:
-                            await self._print_msg('INFO', f'SIM not found. {i} sec tried')
+                            await self._print_msg('INFO', f'SIM not found. {(time.time() - start_time):.03f} sec tried')
 
                     except Exception: pass
             
@@ -205,9 +204,9 @@ class Flasher:
     async def _setAdbMode(self):
         """Get list of ADB devices"""
         await self._print_msg('INFO', f'< Get ADB Devices >')
+        start_time = time.time()
 
         adb_res = []
-        time = 0
         for i in range(3):
             try:
                 cp = ComPort()
@@ -218,7 +217,6 @@ class Flasher:
                 continue
 
             await asyncio.sleep(3)
-            time += 1
 
             res = await self._create_shell(r'\adb devices', 10)
             adb_res = res[0].decode().split('\r\n')   
@@ -229,12 +227,11 @@ class Flasher:
                 break
             
             await asyncio.sleep(1)
-            time += 1
 
         if adb_res[1] == '':
-            await self._print_msg('ERROR', f'No ADB device found in {time} sec')
+            await self._print_msg('ERROR', f'No ADB device found in {(time.time() - start_time):.03f} sec')
         else:
-            await self._print_msg('OK', f'ADB device found in {time} sec')
+            await self._print_msg('OK', f'ADB device found in {(time.time() - start_time):.03f} sec')
             return True
         
         return False
@@ -281,13 +278,15 @@ class Flasher:
     async def _get_fw_version(self) -> bool:
         """Get firmware version of modem"""
         await self._print_msg('INFO', f'< Get FW version >')
+        start_time = time.time()
+
         for i in range(5):
             cp = ComPort()
             if await self._waitForPort(cp, 5):
                 try:
                     fw = await self._AT_send_recv(cp, 'at+GMR', 15)
                     if '+GMR:' in fw[0] and fw[1] == 'OK' and len(fw) == 2:
-                        await self._print_msg('OK', f'FW version got ok in {i} sec')
+                        await self._print_msg('OK', f'FW version got ok in {(time.time() - start_time):.03f} sec')
                         await self._print_msg('INFO', f'FW version: {fw[0][6:]}')
                         return True
                 
@@ -296,12 +295,13 @@ class Flasher:
             cp.closePort()
             await asyncio.sleep(1)
 
-        await self._print_msg('ERROR', f'Get fw version Error')
+        await self._print_msg('ERROR', f'Get fw version Error. {(time.time() - start_time):.03f} sec tried')
         return False
     
     async def _get_fun(self) -> bool:
         """Get flag of correct\incorrect modem state"""
         await self._print_msg('INFO', f'< Get FUN >')
+        start_time = time.time()
         
         for i in range(5):
             cp = ComPort()
@@ -309,10 +309,10 @@ class Flasher:
                 try:
                     fun = await self._AT_send_recv(cp, 'at+CFUN?', 15)           
                     if fun == ['+CFUN: 1', 'OK']:
-                        await self._print_msg('OK', f'FUN ok in {i} sec')
+                        await self._print_msg('OK', f'FUN ok in {(time.time() - start_time):.03f} sec')
                         return True
                     elif '+CFUN' in fun[0] and fun[1] == 'OK' and len(fun) == 2 :
-                        await self._print_msg('ERROR', f'Fun != 1')
+                        await self._print_msg('ERROR', f'Fun != 1 in {(time.time() - start_time):.03f} sec')
                         return False
                 
                 except Exception: pass
@@ -320,7 +320,7 @@ class Flasher:
             cp.closePort()
             await asyncio.sleep(1)
 
-        await self._print_msg('ERROR', f'Get fun Error')
+        await self._print_msg('ERROR', f'Get fun Error. {(time.time() - start_time):.03f} sec tried')
         return False
 
     async def _create_shell(self, cmd: str, secs):
