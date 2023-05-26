@@ -8,7 +8,7 @@ import time
 import os
 import fcntl
 
-VERSION = '1.0.5'
+VERSION = '1.0.6'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -377,42 +377,42 @@ class Flasher:
         if not res[2]: return False
         
         await self._print_msg(f'INFO', '------------------')
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
 
         res = await self._create_shell(r'\fastboot flash sbl '    + self._fw_path + 
                                        r'sbl1.mbn',     10)
         if not res[2]: return False
 
         await self._print_msg(f'INFO', '------------------')
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
 
         res = await self._create_shell(r'\fastboot flash tz '     + self._fw_path + 
                                        r'tz.mbn',       10)
         if not res[2]: return False
 
         await self._print_msg(f'INFO', '------------------')
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
         
         res = await self._create_shell(r'\fastboot flash rpm '    + self._fw_path + 
                                        r'rpm.mbn',      10)
         if not res[2]: return False
 
         res = await self._print_msg(f'INFO', '------------------')
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
 
         res = await self._create_shell(r'\fastboot flash modem '  + self._fw_path + 
                                        r'modem.img',    20)
         if not res[2]: return False
 
         res = await self._print_msg(f'INFO', '------------------')
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
 
         res = await self._create_shell(r'\fastboot flash boot '   + self._fw_path + 
                                        r'boot.img',     10)
         if not res[2]: return False
 
         res = await self._print_msg(f'INFO', '------------------')
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
 
         res = await self._create_shell(r'\fastboot flash system ' + self._fw_path + 
                                        r'system.img',   30)
