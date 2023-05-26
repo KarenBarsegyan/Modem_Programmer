@@ -23,6 +23,7 @@ class Flasher:
         # Path to ADB, Fastboot and FlashData from apt server
         self._adb_fastboot_path = '/usr/lib/android-sdk/platform-tools/'
         self._fw_path_prefix = '/home/pi/FlashData/'
+        self._factory_path = '/home/pi/Factory/'
         
         # Relay pin setup
         gpio.setmode(gpio.BCM)
@@ -427,16 +428,39 @@ class Flasher:
         
         return False
 
-    async def flashModem(self, comport, system) -> bool:
+    async def flashModem(self, comport, system, factoryNum) -> bool:
         self._fw_path = self._fw_path_prefix + system + '/'
         start_time = time.time()
         start_time_nice_format = time.strftime("%H:%M:%S - %d.%m.%Y", time.localtime())
         self._port = comport
 
+        model_id = ''
+        serial_num = ''
+
+        try:
+            os.mkdir(f'{self._factory_path}')
+        except: pass
+
+        try:
+            with open(f'{self._factory_path}factory.cfg', 'w') as file:
+                model_id = factoryNum[:factoryNum.find('#')]
+                serial_num = factoryNum[factoryNum.find('#') + 1:]
+
+                file.write(model_id)
+                file.write('\n')
+                file.write(serial_num)
+        except:
+            await self._print_msg('ERROR', f'Factory.cfg write error')
+            log_status.error(f"Factory.cfg write error")
+            return False
+
+
         # -----> INFO <-----
 
         await self._print_msg('INFO', f'Flasher Version: {VERSION}')
         await self._print_msg('INFO', f'Modem System: {system}')
+        await self._print_msg('INFO', f'{model_id}')
+        await self._print_msg('INFO', f'{serial_num}')
         # Take on Relay
         gpio.output(RELAY_PIN, gpio.LOW)
         await self._print_msg('INFO', f'Start flashing at {start_time_nice_format}')

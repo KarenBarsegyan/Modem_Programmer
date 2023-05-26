@@ -28,10 +28,12 @@ async def main_thread(ws_server, flasher):
             if cmd == 'Start Flashing':
                 log.info("Flash Started")
                 
-                if msg in os.listdir(r'/home/pi/FlashData'):
+                modemSystem = msg[:msg.find('#')]
+                factoryNum = msg[msg.find('#') + 1:]
+                if modemSystem in os.listdir(r'/home/pi/FlashData'):
                     await ws_server.send(f'Start Flashing', 'Ok')
 
-                    if await flasher.flashModem('/dev/ttyUSB2', msg):
+                    if await flasher.flashModem('/dev/ttyUSB2', modemSystem, factoryNum):
                         await ws_server.send('End Flashing', 'Ok')
                     else:
                         await ws_server.send('End Flashing', 'Not Ok')
