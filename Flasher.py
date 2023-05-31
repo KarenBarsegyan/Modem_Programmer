@@ -237,39 +237,48 @@ class Flasher:
     async def _setBootloaderMode(self) -> bool:
         """Reboot device in bootloader (fastboot) mode"""
         await self._print_msg('INFO', f'< Set bootloader mode >')
-        try:
-            res = await self._create_shell(r'\adb reboot bootloader', 30)
-            if res[2]:
-                await self._print_msg('OK', 'SetBootloaderMode Ok')
-                return True
-        except Exception:
-            await self._print_msg('ERROR', 'SetBootloaderMode Error')
-        
+        for i in range(3):
+            try:
+                res = await self._create_shell(r'\adb reboot bootloader', 30)
+                if res[2]:
+                    await self._print_msg('OK', 'SetBootloaderMode Ok')
+                    return True
+            except Exception:
+                await self._print_msg('ERROR', 'SetBootloaderMode Error')
+
+            await asyncio.sleep(1)
+
         return False
 
     async def _setNormalModeFastboot(self) -> bool:
         """Reboot device in normal mode"""
         await self._print_msg('INFO', f'< Set normal mode from fastboot>')
-        try:
-            res = await self._create_shell(r'\fastboot reboot', 20)
-            if res[2]:
-                await self._print_msg('OK', 'SetNormalMode from fastboot Ok')
-                return True
-        except Exception:
-            await self._print_msg('ERROR', 'SetNormalMode from fastboot Error')
+        for i in range(3):
+            try:
+                res = await self._create_shell(r'\fastboot reboot', 20)
+                if res[2]:
+                    await self._print_msg('OK', 'SetNormalMode from fastboot Ok')
+                    return True
+            except Exception:
+                await self._print_msg('ERROR', 'SetNormalMode from fastboot Error')
+
+            await asyncio.sleep(1)
 
         return False
         
     async def _setNormalModeADB(self) -> bool:
         """Reboot device in normal mode"""
         await self._print_msg('INFO', f'< Set normal mode from adb >')
-        try:
-            res = await self._create_shell(r'\adb reboot', 20)
-            if res[2]:
-                await self._print_msg('OK', 'SetNormalMode from adb Ok')
-                return True
-        except Exception:
-            await self._print_msg('ERROR', 'SetNormalMode from adb Error')
+        for i in range(3):
+            try:
+                res = await self._create_shell(r'\adb reboot', 20)
+                if res[2]:
+                    await self._print_msg('OK', 'SetNormalMode from adb Ok')
+                    return True
+            except Exception:
+                await self._print_msg('ERROR', 'SetNormalMode from adb Error')
+
+            await asyncio.sleep(1)
 
         return False
     
@@ -322,10 +331,13 @@ class Flasher:
         return False
 
     async def _create_shell(self, cmd: str, secs):
+        cmd_log = ''
         if len(cmd) > 25:
-            await self._print_msg('INFO', f'< Exec: \"...{cmd[-25:]}\">')
+            cmd_log = f'\"...{cmd[-25:]}\"'
         else:
-            await self._print_msg('INFO', f'< Exec: \"{cmd}\">')
+            cmd_log = f'\"{cmd}\"'
+
+        await self._print_msg('INFO', f'< Exec: {cmd_log}>')
 
         try:
             async with timeout(secs):
@@ -359,56 +371,63 @@ class Flasher:
                     
                         await self._print_msg('INFO', msg)
         
+                    if not result:
+                        await self._print_msg('ERROR', f'CMD {cmd_log} Error')
+
                     return stdout, stderr, result
                 
                 except Exception:
-                    await self._print_msg('ERROR', f'CMD {cmd} Error')
+                    await self._print_msg('ERROR', f'CMD {cmd_log} Error')
                     return '', '', False
 
         except asyncio.exceptions.TimeoutError: 
-            await self._print_msg('ERROR', f'CMD {cmd} timeout')
+            await self._print_msg('ERROR', f'CMD {cmd_log} timeout')
             return '', '', False
 
+    async def _fastboot_cmd(self, cmd, tries):
+        for i in range(3):
+            res = await self._create_shell(cmd, tries)
+            if res[2]: 
+                return True
+            else: 
+                await asyncio.sleep(1)
+        
+        await self._print_msg(f'ERROR', 'Fastboot Error')
+        return False
+
     async def _fastbootFlash(self) -> bool:
-        res = await self._create_shell(r'\fastboot flash aboot '  + self._fw_path + 
-                                       r'appsboot.mbn', 10)
-        if not res[2]: return False
+        if not await self._fastboot_cmd(r'\fastboot flash aboot '  + self._fw_path + 
+                                        r'appsboot.mbn', 10): return False
         
         await self._print_msg(f'INFO', '------------------')
 
-        res = await self._create_shell(r'\fastboot flash sbl '    + self._fw_path + 
-                                       r'sbl1.mbn',     10)
-        if not res[2]: return False
+        if not await self._fastboot_cmd(r'\fastboot flash sbl '    + self._fw_path + 
+                                        r'sbl1.mbn',     10): return False
 
         await self._print_msg(f'INFO', '------------------')
 
-        res = await self._create_shell(r'\fastboot flash tz '     + self._fw_path + 
-                                       r'tz.mbn',       10)
-        if not res[2]: return False
+        if not await self._fastboot_cmd(r'\fastboot flash tz '     + self._fw_path + 
+                                        r'tz.mbn',       10): return False
 
         await self._print_msg(f'INFO', '------------------')
         
-        res = await self._create_shell(r'\fastboot flash rpm '    + self._fw_path + 
-                                       r'rpm.mbn',      10)
-        if not res[2]: return False
+        if not await self._fastboot_cmd(r'\fastboot flash rpm '    + self._fw_path + 
+                                        r'rpm.mbn',      10): return False
 
-        res = await self._print_msg(f'INFO', '------------------')
+        await self._print_msg(f'INFO', '------------------')
 
-        res = await self._create_shell(r'\fastboot flash modem '  + self._fw_path + 
-                                       r'modem.img',    20)
-        if not res[2]: return False
+        if not await self._fastboot_cmd(r'\fastboot flash modem '  + self._fw_path + 
+                                        r'modem.img',    20): return False
 
-        res = await self._print_msg(f'INFO', '------------------')
+        await self._print_msg(f'INFO', '------------------')
 
-        res = await self._create_shell(r'\fastboot flash boot '   + self._fw_path + 
-                                       r'boot.img',     10)
-        if not res[2]: return False
+        if not await self._fastboot_cmd(r'\fastboot flash boot '   + self._fw_path + 
+                                        r'boot.img',     10): return False
 
-        res = await self._print_msg(f'INFO', '------------------')
+        await self._print_msg(f'INFO', '------------------')
 
-        res = await self._create_shell(r'\fastboot flash system ' + self._fw_path + 
-                                       r'system.img',   30)
-        if not res[2]: return False
+        if not await self._fastboot_cmd(r'\fastboot flash system ' + self._fw_path + 
+                                        r'system.img',   30): return False
 
         return True
 
