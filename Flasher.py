@@ -6,7 +6,7 @@ from async_timeout import timeout
 import RPi.GPIO as gpio
 import time
 
-VERSION = '1.1.3'
+VERSION = '1.1.4'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -456,7 +456,13 @@ class Flasher:
         model_id = factoryNum[:factoryNum.find('#')]
         factoryNum = factoryNum[factoryNum.find('#') + 1:]
         serial_num = factoryNum[:factoryNum.find('#')]
-        modem_type = factoryNum[factoryNum.find('#') + 1:]
+        factoryNum = factoryNum[factoryNum.find('#') + 1:]
+        modem_type = factoryNum[:factoryNum.find('#')]
+
+        perform_tests = False
+        if factoryNum[factoryNum.find('#') + 1:] == '1':
+            perform_tests = True
+                
 
         with open(f'factory.cfg', 'w') as file:
             file.write(model_id)
@@ -469,6 +475,7 @@ class Flasher:
         await self._print_msg('INFO', f'Flasher Version: {VERSION}')
         await self._print_msg('INFO', f'Modem System: {system}')
         await self._print_msg('INFO', f'Modem Type: {modem_type}')
+        await self._print_msg('INFO', f'Perform Tests: {perform_tests}')
         await self._print_msg('INFO', f'{model_id}')
         await self._print_msg('INFO', f'{serial_num}')
         # Take on Relay
@@ -577,36 +584,37 @@ class Flasher:
 
         # -----> TEST MODEM <-----
 
-        await self._print_msg('INFO', f'-----> TESTS <-----')
-        await self._print_msg('INFO', f'')
-        test_modem_start_time = time.time()
+        if perform_tests:
+            await self._print_msg('INFO', f'-----> TESTS <-----')
+            await self._print_msg('INFO', f'')
+            test_modem_start_time = time.time()
 
-        # Try send setup commands
-        if not await self._setUpModem():
-            log_status.error(f"Third setup Error. Started in {start_time_nice_format}")
-            return False
+            # Try send setup commands
+            if not await self._setUpModem():
+                log_status.error(f"Third setup Error. Started in {start_time_nice_format}")
+                return False
 
-        await self._print_msg('INFO', f'')
+            await self._print_msg('INFO', f'')
 
-        # Get firmware version
-        if not await self._get_fw_version(): 
-            log_status.error(f"Get FW Error. Started in {start_time_nice_format}")
-            return False
-        
-        await self._print_msg('INFO', f'')
+            # Get firmware version
+            if not await self._get_fw_version(): 
+                log_status.error(f"Get FW Error. Started in {start_time_nice_format}")
+                return False
+            
+            await self._print_msg('INFO', f'')
 
-        # Get status flag
-        if not await self._get_fun(): 
-            log_status.error(f"Get FUN Error. Started in {start_time_nice_format}")
-            return False
-        
-        await self._print_msg('INFO', f'')
+            # Get status flag
+            if not await self._get_fun(): 
+                log_status.error(f"Get FUN Error. Started in {start_time_nice_format}")
+                return False
+            
+            await self._print_msg('INFO', f'')
 
-        await self._print_msg('INFO', f'Test modem time: {(time.time()-test_modem_start_time):.03f} sec')
+            await self._print_msg('INFO', f'Test modem time: {(time.time()-test_modem_start_time):.03f} sec')
 
-        await self._print_msg('INFO', f'')
+            await self._print_msg('INFO', f'')
 
-        await asyncio.sleep(1)
+            await asyncio.sleep(1)
 
         # -----> TEST MODEM END <-----
 
