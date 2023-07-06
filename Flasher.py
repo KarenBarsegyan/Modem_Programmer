@@ -6,7 +6,7 @@ from async_timeout import timeout
 import RPi.GPIO as gpio
 import time
 
-VERSION = '1.1.2'
+VERSION = '1.1.3'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -454,7 +454,9 @@ class Flasher:
         serial_num = ''
 
         model_id = factoryNum[:factoryNum.find('#')]
-        serial_num = factoryNum[factoryNum.find('#') + 1:]
+        factoryNum = factoryNum[factoryNum.find('#') + 1:]
+        serial_num = factoryNum[:factoryNum.find('#')]
+        modem_type = factoryNum[factoryNum.find('#') + 1:]
 
         with open(f'factory.cfg', 'w') as file:
             file.write(model_id)
@@ -466,6 +468,7 @@ class Flasher:
 
         await self._print_msg('INFO', f'Flasher Version: {VERSION}')
         await self._print_msg('INFO', f'Modem System: {system}')
+        await self._print_msg('INFO', f'Modem Type: {modem_type}')
         await self._print_msg('INFO', f'{model_id}')
         await self._print_msg('INFO', f'{serial_num}')
         # Take on Relay
@@ -532,39 +535,40 @@ class Flasher:
 
         # -----> WRITE FACTORY NUM <-----
 
-        await self._print_msg('INFO', f'-----> WRITE FACTORY NUM <-----')
-        await self._print_msg('INFO', f'')
-        write_factory_num_start_time = time.time()
+        if modem_type != 'Retrofit':
+            await self._print_msg('INFO', f'-----> WRITE FACTORY NUM <-----')
+            await self._print_msg('INFO', f'')
+            write_factory_num_start_time = time.time()
 
-        # Try send setup commands
-        if not await self._setUpModem():
-            log_status.error(f"Second setup Error. Started in {start_time_nice_format}")
-            return False
-        
-        await self._print_msg('INFO', f'')
-        
-        # Check until adb device is not found or timeout what is less
-        if not await self._setAdbMode():
-            log_status.error(f"Second get ADB devices Error. Started in {start_time_nice_format}")
-            return False
-        
-        await self._print_msg('INFO', f'')
-        
-        if not await self._writeFactoryNum():
-            log_status.error(f"Factory Num write Error. Started in {start_time_nice_format}")
-            return False
-        
-        await self._print_msg('INFO', f'')
-        
-        if not await self._setNormalModeADB():
-            log_status.error(f"Set Normal mode from ADB Error. Started in {start_time_nice_format}")
-            return False
-        
-        await self._print_msg('INFO', f'')
+            # Try send setup commands
+            if not await self._setUpModem():
+                log_status.error(f"Second setup Error. Started in {start_time_nice_format}")
+                return False
+            
+            await self._print_msg('INFO', f'')
+            
+            # Check until adb device is not found or timeout what is less
+            if not await self._setAdbMode():
+                log_status.error(f"Second get ADB devices Error. Started in {start_time_nice_format}")
+                return False
+            
+            await self._print_msg('INFO', f'')
+            
+            if not await self._writeFactoryNum():
+                log_status.error(f"Factory Num write Error. Started in {start_time_nice_format}")
+                return False
+            
+            await self._print_msg('INFO', f'')
+            
+            if not await self._setNormalModeADB():
+                log_status.error(f"Set Normal mode from ADB Error. Started in {start_time_nice_format}")
+                return False
+            
+            await self._print_msg('INFO', f'')
 
-        await self._print_msg('INFO', f'Write factory num time: {(time.time()-write_factory_num_start_time):.03f} sec')
+            await self._print_msg('INFO', f'Write factory num time: {(time.time()-write_factory_num_start_time):.03f} sec')
 
-        await self._print_msg('INFO', f'')
+            await self._print_msg('INFO', f'')
 
         # -----> WRITE FACTORY NUM END <-----
 
