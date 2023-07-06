@@ -6,7 +6,7 @@ from async_timeout import timeout
 import RPi.GPIO as gpio
 import time
 
-VERSION = '1.1.5'
+VERSION = '1.1.6'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -168,11 +168,10 @@ class Flasher:
         await self._print_msg('INFO', f'< Setup Modem >')
         start_time = time.time()
 
-        # Wait untill modem starts
-        await self._print_msg('INFO', f'Waiting 20 sec while AT port starts')
-        await asyncio.sleep(20)
-
         for cnt in range(2):
+            # Wait untill modem starts
+            await self._print_msg('INFO', f'Waiting 20 sec while AT port starts')
+            await asyncio.sleep(20)
             cp = ComPort()
             if await self._waitForPort(cp, 5):
                 for i in range(5):
