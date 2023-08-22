@@ -17,7 +17,7 @@ while ! curl http://${APT_SERVER_IP_NAME}:8000/apt-repo/keys/pgp-key.public > pg
     fi
 done
 
-APT_SERVER_IP=$(sshpass -p raspberry ssh -o StrictHostKeyChecking=no ${APT_SERVER_IP_NAME} hostname -I | sed 's/.$//'):8000
+APT_SERVER_IP=$(sshpass -p raspberry ssh -o StrictHostKeyChecking=no ${APT_SERVER_IP_NAME} hostname -I | sed 's/.$//' | awk '{print $1}'):8000
 echo -e "-----> Sim7600 Server IP = ${APT_SERVER_IP} <-----"
 
 echo -e "-----> Getting Time From ${APT_SERVER_IP} <-----"
