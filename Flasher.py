@@ -6,7 +6,7 @@ from async_timeout import timeout
 import RPi.GPIO as gpio
 import time
 
-VERSION = '1.1.6'
+VERSION = '1.1.7'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -168,15 +168,15 @@ class Flasher:
         await self._print_msg('INFO', f'< Setup Modem >')
         start_time = time.time()
 
-        for cnt in range(2):
+        for cnt in range(1):
             # Wait untill modem starts
             await self._print_msg('INFO', f'Waiting 20 sec while AT port starts')
             await asyncio.sleep(20)
             cp = ComPort()
             if await self._waitForPort(cp, 5):
-                for i in range(5):
+                for i in range(3):
                     try:
-                        resp = await self._AT_send_recv(cp, 'AT', 5)
+                        resp = await self._AT_send_recv(cp, 'AT', 3)
                         if resp == ['OK']:
                             await self._print_msg('OK', f'AT port check succes in {(time.time() - start_time):.03f} sec')
                             return True
@@ -193,8 +193,8 @@ class Flasher:
             cp.closePort()
             await asyncio.sleep(1)
 
-            if cnt == 0:
-                await self._reset_modem()
+            # if cnt == 0:
+            #     await self._reset_modem()
 
         return False
 
@@ -575,6 +575,10 @@ class Flasher:
             await self._print_msg('INFO', f'Write factory num time: {(time.time()-write_factory_num_start_time):.03f} sec')
 
             await self._print_msg('INFO', f'')
+
+            if not perform_tests:
+                await self._print_msg('INFO', f'Wait 3 sec') 
+                await asyncio.sleep(3)
 
         # -----> WRITE FACTORY NUM END <-----
 

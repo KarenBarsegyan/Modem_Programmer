@@ -26,8 +26,8 @@ class logger():
             os.mkdir(f"{log_path}/")
         except: pass
         
-        log_hndl = RotatingFileHandler(f"{log_path}/{name}.log", maxBytes=100000, 
-                                               backupCount=1, encoding=None, delay=0)
+        log_hndl = RotatingFileHandler(f"{log_path}/{name}.log", maxBytes=1000000, 
+                                               backupCount=3, encoding=None, delay=0)
 
         log_hndl.setFormatter(logging.Formatter(fmt='[%(levelname)s] %(message)s - %(asctime)s'))
 
