@@ -565,6 +565,9 @@ class Flasher:
                 return False
             
             await self._print_msg('INFO', f'')
+            await self._print_msg('INFO', f'Wait 3 sec') 
+            await asyncio.sleep(3)
+            await self._print_msg('INFO', f'')
             
             if not await self._setNormalModeADB():
                 log_status.error(f"Set Normal mode from ADB Error. Started in {start_time_nice_format}")
@@ -579,6 +582,7 @@ class Flasher:
             if not perform_tests:
                 await self._print_msg('INFO', f'Wait 3 sec') 
                 await asyncio.sleep(3)
+                await self._print_msg('INFO', f'')
 
         # -----> WRITE FACTORY NUM END <-----
 
