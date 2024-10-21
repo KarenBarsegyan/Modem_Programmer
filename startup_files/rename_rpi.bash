@@ -20,3 +20,12 @@ sudo echo "${NAME}" > hostname
 sudo sed -i '$ d' hosts
 
 sudo echo "127.0.0.1  ${NAME}" >> hosts
+
+
+if rm ../../bootfs/firstrun.sh 2> /dev/null; 
+then
+  echo "Startup File Deleted"
+else 
+  echo "Startup File Already Deleted"
+fi
+
