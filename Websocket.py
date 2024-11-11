@@ -57,7 +57,7 @@ class WebSocketServer():
 
         # Wait until somebody would ask to close server
         while self._server_manager.is_serving():
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
         
         # Stop Ping task
         ping_task.cancel()
@@ -79,7 +79,7 @@ class WebSocketServer():
 
     async def _ws_is_connected(self):
         while not self._is_conn_established:
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
         return
 
     async def send(self, cmd, msg):
