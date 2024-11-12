@@ -27,10 +27,10 @@ class ComPort:
 
     def openPort(self, comport: str):
         if not self._com.isOpen():
-            self._com.baudrate = 4800
+            self._com.baudrate = 2400
             self._com.port = comport
-            self._com.timeout = 1
-            self._com.write_timeout = 1
+            self._com.timeout = 2
+            self._com.write_timeout = 2
             try:
                 self._com.open()
             except serial.SerialException:
