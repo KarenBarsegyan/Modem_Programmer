@@ -56,6 +56,7 @@ async def main_thread(ws_server, flasher):
         except asyncio.CancelledError:
             log.info("Main thread task was canceled")
         finally:
+            log.info("Main thread finally block")
             break
 
 

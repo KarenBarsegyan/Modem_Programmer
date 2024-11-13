@@ -170,13 +170,14 @@ class Flasher:
 
         for cnt in range(1):
             # Wait untill modem starts
-            await self._print_msg('INFO', f'Waiting 20 sec while AT port starts')
-            await asyncio.sleep(20)
+            await self._print_msg('INFO', f'Waiting 25 sec while AT port starts')
+            await asyncio.sleep(25)
             cp = ComPort()
             if await self._waitForPort(cp, 5):
                 for i in range(3):
                     try:
                         resp = await self._AT_send_recv(cp, 'AT', 3)
+                        await self._print_msg('INFO', f'AT')
                         if resp == ['OK']:
                             await self._print_msg('OK', f'AT port check succes in {(time.time() - start_time):.03f} sec')
                             return True
@@ -190,12 +191,9 @@ class Flasher:
 
                     except Exception: pass
             
+            await self._print_msg('INFO', f'Close port')
             cp.closePort()
             await asyncio.sleep(1)
-
-            # if cnt == 0:
-            #     await self._reset_modem()
-
         return False
 
     async def _setAdbMode(self):

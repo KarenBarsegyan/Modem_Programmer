@@ -7,6 +7,9 @@ echo "Build pkg with version ${VERSION}"
 
 rm *.deb
 rm -r sim7600prg*
+rm -r dist
+rm -r build
+rm *.spec
 
 mkdir -p "sim7600prg_${VERSION}-${RELEASE_NUMBER}_all/usr/bin/"
 mkdir -p "sim7600prg_${VERSION}-${RELEASE_NUMBER}_all/DEBIAN"
