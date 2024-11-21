@@ -6,7 +6,7 @@ from async_timeout import timeout
 import RPi.GPIO as gpio
 import time
 
-VERSION = '1.2.0'
+VERSION = '1.2.1'
 
 log = logger(__name__, logger.INFO, indent=75)
 log_status = logger('FlashStatuses', logger.INFO, indent=75)
@@ -170,8 +170,8 @@ class Flasher:
 
         for cnt in range(1):
             # Wait untill modem starts
-            await self._print_msg('INFO', f'Waiting 25 sec while AT port starts')
-            await asyncio.sleep(25)
+            await self._print_msg('INFO', f'Waiting 20 sec while AT port starts')
+            await asyncio.sleep(20)
             cp = ComPort()
             if await self._waitForPort(cp, 5):
                 for i in range(3):
@@ -229,6 +229,23 @@ class Flasher:
             await self._print_msg('OK', f'ADB device found in {(time.time() - start_time):.03f} sec')
             return True
         
+        return False
+    
+    async def _takeOffAdbMode(self):
+        for i in range(3):
+            try:
+                cp = ComPort()
+                if await self._waitForPort(cp, 5):
+                    cp.sendATCommand('at+cusbadb=0,1')
+                    cp.closePort()
+                    await self._print_msg('OK', f'ADB succesfully taken off. Wait 5 sec')
+                    await asyncio.sleep(5)
+                    return True
+            except:
+                continue
+
+            await asyncio.sleep(3)
+            
         return False
 
     async def _setBootloaderMode(self) -> bool:
@@ -315,7 +332,7 @@ class Flasher:
                     if fun == ['+CFUN: 1', 'OK']:
                         await self._print_msg('OK', f'FUN ok in {(time.time() - start_time):.03f} sec')
                         return True
-                    elif '+CFUN' in fun[0] and fun[1] == 'OK' and len(fun) == 2 :
+                    elif '+CFUN' in fun[0] and fun[1] == 'OK':
                         await self._print_msg('ERROR', f'Fun != 1 in {(time.time() - start_time):.03f} sec')
                         return False
                 
@@ -441,6 +458,10 @@ class Flasher:
         
         return False
 
+    async def _sendErrorStatus(self, status):
+        log_status.error(status)
+        await self._print_msg(f'ERROR', status)
+
     async def flashModem(self, comport, system, factoryNum) -> bool:
         self._fw_path = self._fw_path_prefix + system + '/'
         start_time = time.time()
@@ -493,14 +514,14 @@ class Flasher:
 
         # Try send setup commands
         if not await self._setUpModem():
-            log_status.error(f"First Setup Modem Error. Started in {start_time_nice_format}")
+            await self._sendErrorStatus(f"First Setup Modem Error. Started in {start_time_nice_format}")
             return False
 
         await self._print_msg('INFO', f'')
 
         # Check until adb device is not found or timeout what is less
         if not await self._setAdbMode():
-            log_status.error(f"First get ADB devices Error. Started in {start_time_nice_format}")
+            await self._sendErrorStatus(f"First get ADB devices Error. Started in {start_time_nice_format}")
             return False
 
         await self._print_msg('INFO', f'')
@@ -510,21 +531,21 @@ class Flasher:
 
         # Take on bootloader mode to get ready for flashing
         if not await self._setBootloaderMode():
-            log_status.error(f"Set bootloader mode Error. Started in {start_time_nice_format}")
+            await self._sendErrorStatus(f"Set bootloader mode Error. Started in {start_time_nice_format}")
             return False
 
         await self._print_msg('INFO', f'')
 
         # Flash all of the data step by step
         if not await self._fastbootFlash():
-            log_status.error(f"Flashing Error. Started in {start_time_nice_format}")
+            await self._sendErrorStatus(f"Flashing Error. Started in {start_time_nice_format}")
             return False
 
         await self._print_msg('INFO', f'')
 
         # Reboot in normal mode
         if not await self._setNormalModeFastboot():
-            log_status.error(f"Set Normal mode from fastboot Error. Started in {start_time_nice_format}")
+            await self._sendErrorStatus(f"Set Normal mode from fastboot Error. Started in {start_time_nice_format}")
             return False
 
         await self._print_msg('INFO', f'')
@@ -546,20 +567,20 @@ class Flasher:
 
             # Try send setup commands
             if not await self._setUpModem():
-                log_status.error(f"Second setup Error. Started in {start_time_nice_format}")
+                await self._sendErrorStatus(f"Second setup Error. Started in {start_time_nice_format}")
                 return False
             
             await self._print_msg('INFO', f'')
             
             # Check until adb device is not found or timeout what is less
             if not await self._setAdbMode():
-                log_status.error(f"Second get ADB devices Error. Started in {start_time_nice_format}")
+                await self._sendErrorStatus(f"Second get ADB devices Error. Started in {start_time_nice_format}")
                 return False
             
             await self._print_msg('INFO', f'')
             
             if not await self._writeFactoryNum():
-                log_status.error(f"Factory Num write Error. Started in {start_time_nice_format}")
+                await self._sendErrorStatus(f"Factory Num write Error. Started in {start_time_nice_format}")
                 return False
             
             await self._print_msg('INFO', f'')
@@ -568,7 +589,7 @@ class Flasher:
             await self._print_msg('INFO', f'')
             
             if not await self._setNormalModeADB():
-                log_status.error(f"Set Normal mode from ADB Error. Started in {start_time_nice_format}")
+                await self._sendErrorStatus(f"Set Normal mode from ADB Error. Started in {start_time_nice_format}")
                 return False
             
             await self._print_msg('INFO', f'')
@@ -586,6 +607,28 @@ class Flasher:
 
 
 
+        # -----> TAKE OFF ADB <-----
+
+        await self._print_msg('INFO', f'-----> TAKE OFF ADB <-----')
+        await self._print_msg('INFO', f'')
+
+        # Try send setup commands
+        if not await self._setUpModem():
+            await self._sendErrorStatus(f"Third setup Error. Started in {start_time_nice_format}")
+            return False
+        
+        await self._print_msg('INFO', f'')
+
+        # Get firmware version
+        if not await self._takeOffAdbMode(): 
+            await self._sendErrorStatus(f"Take off ADB Error. Started in {start_time_nice_format}")
+            return False
+
+        await self._print_msg('INFO', f'')
+
+        # -----> TAKE OFF ADB <-----
+
+
 
         # -----> TEST MODEM <-----
 
@@ -594,23 +637,16 @@ class Flasher:
             await self._print_msg('INFO', f'')
             test_modem_start_time = time.time()
 
-            # Try send setup commands
-            if not await self._setUpModem():
-                log_status.error(f"Third setup Error. Started in {start_time_nice_format}")
-                return False
-
-            await self._print_msg('INFO', f'')
-
             # Get firmware version
             if not await self._get_fw_version(): 
-                log_status.error(f"Get FW Error. Started in {start_time_nice_format}")
+                await self._sendErrorStatus(f"Get FW Error. Started in {start_time_nice_format}")
                 return False
             
             await self._print_msg('INFO', f'')
 
             # Get status flag
             if not await self._get_fun(): 
-                log_status.error(f"Get FUN Error. Started in {start_time_nice_format}")
+                await self._sendErrorStatus(f"Get FUN Error. Started in {start_time_nice_format}")
                 return False
             
             await self._print_msg('INFO', f'')
@@ -630,7 +666,6 @@ class Flasher:
         
         await self._print_msg('OK', f'Success!')
         log_status.info(f"Success. Started in {start_time_nice_format}")
-
 
         # Show time from begin of flashing
         await self._print_msg('INFO', f'Full Time: {(time.time()-start_time):.03f} sec')
